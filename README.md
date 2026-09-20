@@ -1,5 +1,7 @@
 # migration-worker - Phase 2 Metadata
 
+> Runtime baseline: Java 22 (`D:\Lang\JDK\oracle_jdk_22` on the current development machine)
+
 ## Scope
 
 This project implements **Phase 1 - Project Skeleton** and **Phase 2 - Metadata**.
@@ -58,6 +60,13 @@ They are created at Batch Group initialization and closed in `finally`.
 They are **not static global connections** and are **not created per table**.
 
 ## Build
+
+Java 22 and Maven are required. Verify the active JDK before building:
+
+```bash
+java -version
+javac -version
+```
 
 ```bash
 mvn clean test

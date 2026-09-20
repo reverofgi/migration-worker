@@ -1,10 +1,10 @@
 package com.migration.util;
 
 /**
- * SQL utility extension point.
+ * SQL 유틸리티 확장 지점.
  *
- * Phase 1 intentionally does not build Sybase IQ SQL.
- * Dynamic Identifier validation and SQL generation belong to later phases.
+ * Phase 1에서는 Sybase IQ SQL을 의도적으로 생성하지 않는다.
+ * 동적 식별자 검증과 SQL 생성은 이후 단계의 책임이다.
  */
 public final class SqlUtil {
 
@@ -12,8 +12,8 @@ public final class SqlUtil {
     }
 
     /**
-     * Minimal identifier check for future SQL-builder use.
-     * This is not a complete Sybase IQ identifier policy.
+     * 이후 SQL 빌더에서 사용할 최소한의 식별자 검증이다.
+     * Sybase IQ의 전체 식별자 정책을 구현한 것은 아니다.
      */
     public static boolean isSimpleIdentifier(String value) {
         if (value == null || value.isEmpty()) {

@@ -1,0 +1,33 @@
+"[Request] Sybase IQ 대용량 데이터 이관용 경량 Java 배치 프로그램 개발" 내용을 아래 항목을 검토하고 반영하여 다시 작성해줘.
+
+------------------------------------------- 
+## 4. 상세 처리 프로세스 (4-Step Pipeline)
+[Step 0: 초기화 및 메타데이터 조회]
+* java 배치프로그램 실행에 필요한 모든 속성정보는 MariaDB(GODIS)의 공통코드테이블(GPCL_CM_CD_VAL)에서 추출.
+  - GPCL_CM_CD_VAL테이블의 GRP_CD_ID컬럼값이 "MIGRATION_PROPERTIES"인 모든 항목이 속성정보임.
+  - AS-IS와 TO-BE Connection 정보
+  - 공유 볼륨 내 추출 파일 저장 경로 및 파일명 규칙
+  - Blob 컬럼 저장위치 등
+* 추출에 필요한 정보(AS-IS 테이블 및 컬럼정보)는 MariaDB(GODIS)의 이관정보테이블(GPCL_MIG_TABLE, GPCL_MIG_VRF_TARGET)에서 추출
+* AS-IS와 TO-BE 테이블의 정보는 동일하므로 이관정보테이블(GPCL_MIG_TABLE, GPCL_MIG_VRF_TARGET) 한개 세트로 관리함
+* AS-IS 추출 결과에 대한 건수/합계/평균/최소/최대 값을 GPCL_MIG_VRF_RESULT insert하고
+  TO-BE 적재 결과에 대한 건수/합계/평균/최소/최대 값은 GPCL_MIG_VRF_RESULT update한다.
+
+## 5. 요청 산출물
+2. **설정 파일**:
+   - batch실행에 필요한 properties는 공통코드테이블(GPCL_CM_CD_VAL)에서 읽어서 설정
+
+3. **MyBatis XML 매퍼**:
+   - `AsisMapper.xml`: Sybase IQ 추출/Load 및 ASIS/TOBE 검증 쿼리
+
+4. **Java 소스 코드**:
+   - MigrationWorkerApplication.java (인자 파싱, 팩토리 초기화, 배치 오케스트레이션)
+   - MigrationWorker.java (4단계 파이프라인 비즈니스 로직 및 트랜잭션/예외 처리)
+   - ConnectionFactory.java (ASIS, TOBE, MariaDB의 SqlSessionFactory/Connection 제어)
+   - SybaseIQUnloadWorker.java
+   - SybaseIQLoadWorker.java
+   - MigrationValidator.java (동적 검증 쿼리 생성 및 비교 로직)
+   - SybaseIQSqlBuilder.java
+   - FileUtil.java (공유볼륨 파일 존재 확인 및 적재 후 안전한 파일 삭제)
+   - LogUtil.java
+   - SqlUtil.java 등 

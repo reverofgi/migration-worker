@@ -1,7 +1,7 @@
 package com.migration.config;
 
 /**
- * Process exit codes defined by the Master Prompt.
+ * 요구사항에 정의된 프로세스 종료 코드.
  */
 public enum ExitCode {
 

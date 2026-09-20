@@ -6,14 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Application entry point.
+ * 애플리케이션 진입점.
  *
- * Phase 1 responsibility:
- * - Parse CLI arguments.
- * - Create and execute MigrationWorker.
- * - Convert the result/exception into an exit code.
+ * Phase 1의 책임:
+ * - CLI 인자를 해석한다.
+ * - MigrationWorker를 생성하고 실행한다.
+ * - 실행 결과 또는 예외를 종료 코드로 변환한다.
  *
- * Business migration logic must not be implemented here.
+ * 실제 이관 업무 로직은 이 클래스에 구현하지 않는다.
  */
 public final class MigrationWorkerApplication {
 
@@ -21,7 +21,7 @@ public final class MigrationWorkerApplication {
             LoggerFactory.getLogger(MigrationWorkerApplication.class);
 
     private MigrationWorkerApplication() {
-        // Utility class.
+        // 인스턴스 생성을 허용하지 않는 유틸리티 클래스다.
     }
 
     public static void main(String[] args) {
@@ -29,13 +29,14 @@ public final class MigrationWorkerApplication {
 
         try {
             MigrationWorker worker = MigrationWorker.fromArguments(args);
+            worker.initializeProperties();
             worker.execute();
         } catch (MigrationException e) {
             exitCode = e.getExitCode();
-            LOGGER.error("Migration Worker failed. exitCode={}", exitCode, e);
+            LOGGER.error("Migration Worker 실행에 실패했습니다. exitCode={}", exitCode, e);
         } catch (Exception e) {
             exitCode = ExitCode.SYSTEM_ERROR.getCode();
-            LOGGER.error("Unexpected Migration Worker failure.", e);
+            LOGGER.error("Migration Worker 실행 중 예상하지 못한 오류가 발생했습니다.", e);
         }
 
         System.exit(exitCode);

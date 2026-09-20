@@ -1,6 +1,6 @@
 package com.migration.metadata;
 
-/** Migration table metadata read from GPCL_MIG_TABLE. */
+/** GPCL_MIG_TABLE에서 조회한 이관 테이블 메타데이터. */
 public class TableInfo {
     private String tableSchema;
     private String tableName;

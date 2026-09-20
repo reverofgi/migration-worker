@@ -4,7 +4,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-/** MyBatis mapper for the confirmed Phase 2 metadata tables. */
+/** 확인된 Phase 2 메타데이터 테이블용 MyBatis 매퍼. */
 public interface MetaMapper {
     List<TableInfo> selectMigrationTables(@Param("jobId") String jobId);
 

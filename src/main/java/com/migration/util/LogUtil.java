@@ -1,11 +1,11 @@
 package com.migration.util;
 
 /**
- * Logging utility extension point.
+ * 로깅 유틸리티 확장 지점.
  *
- * Phase 1 keeps logging through SLF4J directly in the application classes.
- * Structured MDC/context helpers can be added in a later phase once the
- * execution context fields are finalized.
+ * Phase 1에서는 애플리케이션 클래스가 SLF4J를 통해 직접 로그를 기록한다.
+ * 실행 컨텍스트 필드가 확정되면 이후 단계에서 구조화된 MDC 및 컨텍스트
+ * 도우미를 추가할 수 있다.
  */
 public final class LogUtil {
 

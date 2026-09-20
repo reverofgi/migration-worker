@@ -1,7 +1,7 @@
 package com.migration.exception;
 
 /**
- * Base checked exception for Migration Worker failures.
+ * Migration Worker 오류에 사용하는 최상위 검사 예외.
  */
 public class MigrationException extends Exception {
 

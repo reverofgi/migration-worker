@@ -1,6 +1,6 @@
 package com.migration.metadata;
 
-/** Column and aggregate metadata read from GPCL_MIG_VRF_TARGET. */
+/** GPCL_MIG_VRF_TARGET에서 조회한 컬럼 및 집계 메타데이터. */
 public class ValidationTarget {
     private String tableSchema;
     private String tableName;
