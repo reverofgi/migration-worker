@@ -23,8 +23,8 @@ public final class SybaseIQSchemaReader {
 
     /**
      * Sybase 카탈로그나 JDBC DatabaseMetaData 대신 메타데이터를 사용한다.
-     * 프로젝트 요구사항에 따라 nullable 여부는 GPCL_MIG_VRF_TARGET에서
-     * 제공하지 않으므로 알 수 없는 값으로 유지한다.
+     * TABLE_SCHEMA는 검증 대상 테이블 인자로 받고, 컬럼 속성은
+     * GPCL_MIG_VRF_TARGET 메타데이터를 사용한다.
      */
     public TableSchema read(String tableSchema, String tableName,
                             List<ValidationTarget> targets) throws SchemaException {
@@ -35,7 +35,7 @@ public final class SybaseIQSchemaReader {
         }
 
         List<ValidationTarget> ordered = new ArrayList<>(targets);
-        ordered.sort(Comparator.comparingInt(ValidationTarget::getOrdinalPosition));
+        ordered.sort(Comparator.comparingInt(ValidationTarget::getColOrd));
         List<ColumnSchema> columns = new ArrayList<>(ordered.size());
         Set<String> names = new HashSet<>();
         Set<Integer> ordinals = new HashSet<>();
@@ -45,41 +45,41 @@ public final class SybaseIQSchemaReader {
                 throw new SchemaException("Physical schema contains a null column target.");
             }
             validateOwner(tableSchema, tableName, target);
-            if (!names.add(requireText(target.getColumnName(), "COLUMN_NAME")
+            if (!names.add(requireText(target.getColNm(), "COL_NM")
                     .toUpperCase(Locale.ROOT))) {
-                throw new SchemaException("Duplicate physical column: " + target.getColumnName());
+                throw new SchemaException("Duplicate physical column: " + target.getColNm());
             }
-            if (!ordinals.add(target.getOrdinalPosition())) {
+            if (!ordinals.add(target.getColOrd())) {
                 throw new SchemaException("Duplicate physical column ordinal: "
-                        + target.getOrdinalPosition());
+                        + target.getColOrd());
             }
-            columns.add(toColumnSchema(target));
+            columns.add(toColumnSchema(tableSchema, target));
         }
         return new TableSchema(tableSchema, tableName, columns);
     }
 
-    /** 스키마가 다르면 Phase 3 규칙에 따라 SCHEMA_MISMATCH로 실패한다. */
-    public void validateCompatible(TableSchema asis, TableSchema tobe)
+        public void validateCompatible(TableSchema source, TableSchema target)
             throws SchemaException {
-        if (asis == null || tobe == null) {
+        if (source == null || target == null) {
             throw mismatch("AS-IS and TO-BE schemas are required");
         }
-        if (!asis.exists()) throw mismatch("AS-IS table does not exist: " + qualified(asis));
-        if (!tobe.exists()) throw mismatch("TO-BE table does not exist: " + qualified(tobe));
-        if (!same(asis.getTableSchema(), tobe.getTableSchema())
-                || !same(asis.getTableName(), tobe.getTableName())) {
-            throw mismatch("table identity differs: " + qualified(asis) + " vs " + qualified(tobe));
+        if (!source.exists()) throw mismatch("AS-IS table does not exist: " + qualified(source));
+        if (!target.exists()) throw mismatch("TO-BE table does not exist: " + qualified(target));
+        if (!same(source.getTableSchema(), target.getTableSchema())
+                || !same(source.getTableName(), target.getTableName())) {
+            throw mismatch("table identity differs: " + qualified(source) + " vs " + qualified(target));
         }
-        if (asis.getColumns().size() != tobe.getColumns().size()) {
-            throw mismatch("column count differs: " + asis.getColumns().size()
-                    + " vs " + tobe.getColumns().size());
+        if (source.getColumns().size() != target.getColumns().size()) {
+            throw mismatch("column count differs: " + source.getColumns().size()
+                    + " vs " + target.getColumns().size());
         }
-        for (int i = 0; i < asis.getColumns().size(); i++) {
-            compareColumn(asis.getColumns().get(i), tobe.getColumns().get(i));
+        for (int i = 0; i < source.getColumns().size(); i++) {
+            compareColumn(source.getColumns().get(i), target.getColumns().get(i));
         }
     }
 
-    private ColumnSchema toColumnSchema(ValidationTarget target) throws SchemaException {
+    private ColumnSchema toColumnSchema(String tableSchema, ValidationTarget target)
+            throws SchemaException {
         String rawType = requireText(target.getDataType(), "DATA_TYPE");
         Matcher matcher = TYPE_PATTERN.matcher(rawType);
         if (!matcher.matches()) {
@@ -90,46 +90,46 @@ public final class SybaseIQSchemaReader {
         Integer size = parseInteger(matcher.group(2), rawType);
         boolean numeric = baseType.equals("DECIMAL") || baseType.equals("NUMERIC");
         Integer scale = numeric ? parseInteger(matcher.group(3), rawType) : null;
-        return new ColumnSchema(target.getTableSchema(), target.getTableName(),
-                target.getColumnName(), target.getOrdinalPosition(), baseType,
-                size, scale, null);
+        return new ColumnSchema(tableSchema, target.getTableNm(),
+                target.getColNm(), target.getColOrd(), baseType,
+                size, scale, target.isNullYn());
     }
 
     private void validateOwner(String schema, String table, ValidationTarget target)
             throws SchemaException {
-        if (!same(schema, target.getTableSchema()) || !same(table, target.getTableName())) {
+        if (!same(table, target.getTableNm())) {
             throw new SchemaException("Physical column belongs to another table: "
-                    + target.getTableSchema() + "." + target.getTableName());
+                    + target.getTableNm());
         }
-        requireText(target.getColumnName(), "COLUMN_NAME");
-        if (target.getOrdinalPosition() <= 0) {
-            throw new SchemaException("ORDINAL_POSITION must be greater than zero: "
-                    + target.getColumnName());
+        requireText(target.getColNm(), "COL_NM");
+        if (target.getColOrd() <= 0) {
+            throw new SchemaException("COL_ORD must be greater than zero: "
+                    + target.getColNm());
         }
     }
 
-    private void compareColumn(ColumnSchema asis, ColumnSchema tobe) throws SchemaException {
-        String column = asis.getColumnName();
-        if (!same(column, tobe.getColumnName())) {
-            throw mismatch("column name differs at ordinal " + asis.getOrdinalPosition()
-                    + ": " + column + " vs " + tobe.getColumnName());
+    private void compareColumn(ColumnSchema source, ColumnSchema target) throws SchemaException {
+        String column = source.getColumnName();
+        if (!same(column, target.getColumnName())) {
+            throw mismatch("column name differs at ordinal " + source.getOrdinalPosition()
+                    + ": " + column + " vs " + target.getColumnName());
         }
-        if (asis.getOrdinalPosition() != tobe.getOrdinalPosition()) {
+        if (source.getOrdinalPosition() != target.getOrdinalPosition()) {
             throw mismatch("ordinal differs for column " + column);
         }
-        if (!same(asis.getDataType(), tobe.getDataType())) {
+        if (!same(source.getDataType(), target.getDataType())) {
             throw mismatch("data type differs for column " + column + ": "
-                    + asis.getDataType() + " vs " + tobe.getDataType());
+                    + source.getDataType() + " vs " + target.getDataType());
         }
-        compareKnown("length/precision", column, asis.getColumnSize(), tobe.getColumnSize());
-        compareKnown("scale", column, asis.getDecimalDigits(), tobe.getDecimalDigits());
-        compareKnown("nullable", column, asis.getNullable(), tobe.getNullable());
+        compareKnown("length/precision", column, source.getColumnSize(), target.getColumnSize());
+        compareKnown("scale", column, source.getDecimalDigits(), target.getDecimalDigits());
+        compareKnown("nullable", column, source.getNullable(), target.getNullable());
     }
 
-    private void compareKnown(String field, String column, Object asis, Object tobe)
+    private void compareKnown(String field, String column, Object source, Object target)
             throws SchemaException {
-        if (asis != null && tobe != null && !Objects.equals(asis, tobe)) {
-            throw mismatch(field + " differs for column " + column + ": " + asis + " vs " + tobe);
+        if (source != null && target != null && !Objects.equals(source, target)) {
+            throw mismatch(field + " differs for column " + column + ": " + source + " vs " + target);
         }
     }
 

@@ -834,8 +834,7 @@ Extract Option을 먼저 설정한다.
     stmt.execute("SET TEMPORARY OPTION Temp_Extract_Name1 = '" + metaFile + "'");
     stmt.execute("SET TEMPORARY OPTION Temp_Extract_Name2 = '" + blobFile + "'");
     stmt.execute("SET TEMPORARY OPTION Temp_Extract_Binary = 'ON'");
-    stmt.execute("SET TEMPORARY OPTION Temp_Extract_Size1 = '21474836480'"); // 20GB 분할
-
+    
     // 2. Query 실행 -> Sybase IQ 엔진이 DB 서버 디스크에 직접 대량 파일 생성
     System.out.println("Start Unload Table: " + tableName);
     stmt.executeQuery("SELECT * FROM " + tableName);

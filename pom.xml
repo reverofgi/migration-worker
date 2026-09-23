@@ -31,6 +31,7 @@
         <junit.version>5.13.1</junit.version>
         <h2.version>2.3.232</h2.version>
         <mariadb.version>3.5.7</mariadb.version>
+        <jconnect.version>16.0.SP03.PL02</jconnect.version>
     </properties>
 
     <dependencies>
@@ -57,6 +58,14 @@
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
             <version>${mariadb.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.sybase</groupId>
+            <artifactId>jconn4</artifactId>
+            <version>${jconnect.version}</version>
+            <scope>system</scope>
+            <systemPath>${user.home}/AppData/Roaming/DBeaverData/drivers/drivers/sybase/jconnect/jconn4.jar</systemPath>
         </dependency>
 
 

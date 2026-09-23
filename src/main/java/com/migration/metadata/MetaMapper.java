@@ -4,11 +4,20 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-/** 확인된 Phase 2 메타데이터 테이블용 MyBatis 매퍼. */
 public interface MetaMapper {
-    List<TableInfo> selectMigrationTables(@Param("jobId") String jobId);
+    List<MigrationProperty> selectMigrationProperties();
+
+    MigrationTableInfo selectMigrationTable(
+        @Param("taskId") String taskId);
 
     List<ValidationTarget> selectValidationTargets(
-            @Param("tableSchema") String tableSchema,
-            @Param("tableName") String tableName);
+        @Param("tableId") String tableId);
+
+    int upsertSourceValidationResults(
+            @Param("execOrd") int execOrd,
+            @Param("tableId") String tableId,
+            @Param("procOrd") int procOrd,
+            @Param("mngrId") String mngrId,
+            @Param("auditId") String auditId,
+            @Param("results") List<SourceValidationResult> results);
 }
