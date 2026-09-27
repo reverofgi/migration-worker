@@ -4,6 +4,7 @@ import com.migration.exception.SchemaException;
 import com.migration.metadata.ColumnSchema;
 import com.migration.metadata.TableSchema;
 import com.migration.metadata.ValidationTarget;
+import com.migration.util.SqlUtil;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,7 +16,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** GPCL_MIG_VRF_TARGET 메타데이터로 물리 스키마를 구성하고 비교한다. */
+/** MIG_COL_INFO 메타데이터로 물리 스키마를 구성하고 비교한다. */
 public final class SybaseIQSchemaReader {
     private static final Pattern TYPE_PATTERN = Pattern.compile(
             "^\\s*([A-Z][A-Z0-9 ]*?)(?:\\s*\\(\\s*(\\d+)\\s*(?:,\\s*(\\d+)\\s*)?\\))?\\s*$",
@@ -24,7 +25,7 @@ public final class SybaseIQSchemaReader {
     /**
      * Sybase 카탈로그나 JDBC DatabaseMetaData 대신 메타데이터를 사용한다.
      * TABLE_SCHEMA는 검증 대상 테이블 인자로 받고, 컬럼 속성은
-     * GPCL_MIG_VRF_TARGET 메타데이터를 사용한다.
+     * MIG_COL_INFO 메타데이터를 사용한다.
      */
     public TableSchema read(String tableSchema, String tableName,
                             List<ValidationTarget> targets) throws SchemaException {
@@ -53,7 +54,7 @@ public final class SybaseIQSchemaReader {
                 throw new SchemaException("Duplicate physical column ordinal: "
                         + target.getColOrd());
             }
-            columns.add(toColumnSchema(tableSchema, target));
+            columns.add(toColumnSchema(tableSchema, tableName, target));
         }
         return new TableSchema(tableSchema, tableName, columns);
     }
@@ -78,7 +79,10 @@ public final class SybaseIQSchemaReader {
         }
     }
 
-    private ColumnSchema toColumnSchema(String tableSchema, ValidationTarget target)
+    private ColumnSchema toColumnSchema(
+            String tableSchema,
+            String tableName,
+            ValidationTarget target)
             throws SchemaException {
         String rawType = requireText(target.getDataType(), "DATA_TYPE");
         Matcher matcher = TYPE_PATTERN.matcher(rawType);
@@ -90,16 +94,16 @@ public final class SybaseIQSchemaReader {
         Integer size = parseInteger(matcher.group(2), rawType);
         boolean numeric = baseType.equals("DECIMAL") || baseType.equals("NUMERIC");
         Integer scale = numeric ? parseInteger(matcher.group(3), rawType) : null;
-        return new ColumnSchema(tableSchema, target.getTableNm(),
+        return new ColumnSchema(tableSchema, tableName,
                 target.getColNm(), target.getColOrd(), baseType,
                 size, scale, target.isNullYn());
     }
 
     private void validateOwner(String schema, String table, ValidationTarget target)
             throws SchemaException {
-        if (!same(table, target.getTableNm())) {
-            throw new SchemaException("Physical column belongs to another table: "
-                    + target.getTableNm());
+        if (!same(schema, target.getTableOwner())) {
+            throw new SchemaException("Physical column belongs to another owner: "
+                    + target.getTableOwner());
         }
         requireText(target.getColNm(), "COL_NM");
         if (target.getColOrd() <= 0) {
@@ -150,7 +154,7 @@ public final class SybaseIQSchemaReader {
     }
 
     private static boolean same(String left, String right) {
-        return left != null && right != null && left.equalsIgnoreCase(right);
+        return SqlUtil.identifiersEqual(left, right);
     }
 
     private static String qualified(TableSchema schema) {

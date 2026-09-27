@@ -8,6 +8,8 @@ import com.migration.exception.MetadataException;
 import com.migration.metadata.MetaMapper;
 import com.migration.metadata.MigrationTableInfo;
 import com.migration.worker.SybaseIQUnloadWorker;
+import com.migration.worker.SybaseIQLoadWorker;
+import com.migration.worker.LoadResultVerifyWorker;
 import com.migration.worker.UnloadResultVerifyWorker;
 import com.migration.util.ConnectionUtil;
 import org.apache.ibatis.io.Resources;
@@ -100,14 +102,13 @@ public final class MigrationWorker {
                 .execute(table);
     }
 
-    private void load(MigrationTableInfo table) {
-        // TODO Phase 5: Physical Schema 기반 LoadWorker를 호출한다.
-        LOGGER.debug("Load 구현 대기: table={}", table.getTableNm());
+    private void load(MigrationTableInfo table) throws MigrationException {
+        new SybaseIQLoadWorker(tobeConnection).execute(table);
     }
 
-    private void loadResultVerify(MigrationTableInfo table) {
-        // TODO Phase 6: LoadResultVerifyWorker를 호출하고 GODIS에 적재 결과를 저장한다.
-        LOGGER.debug("Load 검증 구현 대기: table={}", table.getTableNm());
+    private void loadResultVerify(MigrationTableInfo table) throws MigrationException {
+        new LoadResultVerifyWorker(tobeConnection, godisConnection, config)
+                .execute(table);
     }
 
     private void validateConnections() throws InitializationException {

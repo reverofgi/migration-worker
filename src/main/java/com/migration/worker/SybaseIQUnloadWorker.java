@@ -1,6 +1,6 @@
 package com.migration.worker;
 
-import com.migration.config.MigrationProperties;
+import com.migration.config.MigrationFileFormat;
 import com.migration.config.MigrationStoragePaths;
 import com.migration.exception.ExtractException;
 import com.migration.metadata.MigrationTableInfo;
@@ -47,21 +47,24 @@ public final class SybaseIQUnloadWorker {
     public void execute(MigrationTableInfo table) throws ExtractException {
         Objects.requireNonNull(table, "table");
 
-        ExtractSettings settings = loadExtractSettings();
+        MigrationFileFormat settings = loadExtractSettings();
 
-        String tableName = validateIdentifier(table.getTableNm(), "table name");
+        String tableName = qualifiedTableName(table);
         List<ValidationTarget> columns = validateAndOrderColumns(table);
-        validateLobMetadata(table, columns);
+        boolean hasBinaryColumns = hasBinaryColumn(columns);
+        validateLobMetadata(table, hasBinaryColumns);
 
         try {
             MigrationStoragePaths storagePaths = MigrationStoragePaths.load();
             String extractDirectoryName = buildExtractDirectoryName(tableName, table.getProcOrd());
-            createWorkerDirectories(storagePaths, extractDirectoryName);
+            createWorkerDirectories(storagePaths, extractDirectoryName, hasBinaryColumns);
             String dataDirectory = storagePaths.databaseDataDirectory(extractDirectoryName);
-            String blobDirectory = storagePaths.databaseBlobDirectory(extractDirectoryName);
             String extractFileBaseName = buildExtractFileBaseName(table);
             String dataFile = joinPath(dataDirectory, extractFileBaseName + "_data.dat");
-            String blobPrefix = joinPath(blobDirectory, extractFileBaseName + "_");
+            String blobPrefix = hasBinaryColumns
+                    ? joinPath(storagePaths.databaseBlobDirectory(extractDirectoryName),
+                            extractFileBaseName + "_")
+                    : null;
             String extractSql = buildExtractSql(table, columns, blobPrefix, settings);
 
             executeExtract(tableName, dataFile, extractSql, settings);
@@ -76,11 +79,12 @@ public final class SybaseIQUnloadWorker {
     }
 
     private String buildExtractSql(MigrationTableInfo table, List<ValidationTarget> columns,
-                                   String blobPrefix, ExtractSettings settings)
+                                   String blobPrefix, MigrationFileFormat settings)
             throws ExtractException {
-        String tableName = validateIdentifier(table.getTableNm(), "table name");
+        String tableName = qualifiedTableName(table);
         List<ValidationTarget> primaryKeys = columns.stream()
                 .filter(ValidationTarget::isPkYn)
+                .sorted(Comparator.comparingInt(ValidationTarget::getColOrd))
                 .toList();
 
         if (hasBinaryColumn(columns) && primaryKeys.isEmpty()) {
@@ -109,11 +113,19 @@ public final class SybaseIQUnloadWorker {
         if (table.getMigCond() != null && !table.getMigCond().isBlank()) {
             sql.append(" WHERE ").append(table.getMigCond().trim());
         }
+        if (!primaryKeys.isEmpty()) {
+            List<String> primaryKeyNames = new ArrayList<>(primaryKeys.size());
+            for (ValidationTarget primaryKey : primaryKeys) {
+                primaryKeyNames.add(validateIdentifier(
+                        primaryKey.getColNm(), "PK column name"));
+            }
+            sql.append(" ORDER BY ").append(String.join(", ", primaryKeyNames));
+        }
         return sql.toString();
     }
 
     private void executeExtract(String tableName, String dataFile, String extractSql,
-                                ExtractSettings settings)
+                                MigrationFileFormat settings)
             throws SQLException {
         try (Statement statement = connection.createStatement()) {
             SQLException executionFailure = null;
@@ -139,7 +151,10 @@ public final class SybaseIQUnloadWorker {
         }
     }
 
-    private void configureExtract(Statement statement, String dataFile, ExtractSettings settings)
+    private void configureExtract(
+            Statement statement,
+            String dataFile,
+            MigrationFileFormat settings)
             throws SQLException {
         statement.execute("SET TEMPORARY OPTION TEMP_EXTRACT_NAME1 = '"
                 + SqlUtil.escapeLiteral(dataFile) + "'");
@@ -188,7 +203,7 @@ public final class SybaseIQUnloadWorker {
     private String buildNullableExpression(
             ValidationTarget column,
             String columnName,
-            ExtractSettings settings) throws ExtractException {
+            MigrationFileFormat settings) throws ExtractException {
 
         String valueExpression = buildTextValueExpression(columnName, column.getDataType());
         return "CASE WHEN " + columnName + " IS NULL THEN '"
@@ -210,26 +225,27 @@ public final class SybaseIQUnloadWorker {
             return columnName;
         }
 
-        int varcharLength = switch (baseType) {
-            case "TINYINT" -> 4;
-            case "SMALLINT" -> 6;
-            case "INTEGER", "INT" -> 11;
-            case "BIGINT" -> 20;
-            case "UNSIGNED TINYINT", "TINYINT UNSIGNED" -> 3;
-            case "UNSIGNED SMALLINT", "SMALLINT UNSIGNED" -> 5;
-            case "UNSIGNED INTEGER", "UNSIGNED INT",
-                 "INTEGER UNSIGNED", "INT UNSIGNED" -> 10;
-            case "UNSIGNED BIGINT", "BIGINT UNSIGNED" -> 20;
-            case "DECIMAL", "DEC", "NUMERIC" -> decimalTextLength(
-                    matcher.group(2), matcher.group(3), dataType);
-            case "REAL", "FLOAT", "DOUBLE", "DOUBLE PRECISION" -> 64;
-            case "DATE" -> 10;
-            case "TIME" -> 18;
-            case "TIMESTAMP", "DATETIME", "SMALLDATETIME" -> 32;
-            case "BIT", "BOOLEAN" -> 5;
-            default -> throw new ExtractException(
-                    "문자열 변환 규칙이 없는 DATA_TYPE입니다: " + dataType);
-        };
+        int varcharLength =
+            switch (baseType) {
+                case "TINYINT" -> 4;
+                case "SMALLINT" -> 6;
+                case "INTEGER", "INT" -> 11;
+                case "BIGINT" -> 20;
+                case "UNSIGNED TINYINT", "TINYINT UNSIGNED" -> 3;
+                case "UNSIGNED SMALLINT", "SMALLINT UNSIGNED" -> 5;
+                case "UNSIGNED INTEGER", "UNSIGNED INT",
+                    "INTEGER UNSIGNED", "INT UNSIGNED" -> 10;
+                case "UNSIGNED BIGINT", "BIGINT UNSIGNED" -> 20;
+                case "DECIMAL", "DEC", "NUMERIC" -> decimalTextLength(
+                        matcher.group(2), matcher.group(3), dataType);
+                case "REAL", "FLOAT", "DOUBLE", "DOUBLE PRECISION" -> 64;
+                case "DATE" -> 10;
+                case "TIME" -> 18;
+                case "TIMESTAMP", "DATETIME", "SMALLDATETIME" -> 32;
+                case "BIT", "BOOLEAN" -> 5;
+                default -> throw new ExtractException(
+                        "문자열 변환 규칙이 없는 DATA_TYPE입니다: " + dataType);
+            };
         return "CAST(" + columnName + " AS VARCHAR(" + varcharLength + "))";
     }
 
@@ -257,7 +273,7 @@ public final class SybaseIQUnloadWorker {
             String columnName,
             List<ValidationTarget> primaryKeys,
             String blobPrefix,
-            ExtractSettings settings) throws ExtractException {
+            MigrationFileFormat settings) throws ExtractException {
 
         List<String> keyExpressions = new ArrayList<>(primaryKeys.size());
         for (ValidationTarget primaryKey : primaryKeys) {
@@ -277,30 +293,19 @@ public final class SybaseIQUnloadWorker {
                 + SqlUtil.escapeLiteral(settings.bfileErrorToken()) + "' END";
     }
 
-    private ExtractSettings loadExtractSettings() throws ExtractException {
+    private MigrationFileFormat loadExtractSettings() throws ExtractException {
         try {
-            return new ExtractSettings(
-                    MigrationProperties.getRequired("NULL_TOKEN"),
-                    MigrationProperties.getRequired("BFILE_ERROR_TOKEN"),
-                    MigrationProperties.getRequired("COLUMN_DELIMITER"),
-                    MigrationProperties.getRequired("ROW_DELIMITER"));
+            return MigrationFileFormat.load();
         } catch (SQLException e) {
             throw new ExtractException("추출 설정을 읽지 못했습니다.", e);
         }
-    }
-
-    private record ExtractSettings(
-            String nullToken,
-            String bfileErrorToken,
-            String columnDelimiter,
-            String rowDelimiter) {
     }
 
     /**
      * 이관 대상 테이블의 컬럼 정보를 검증하고 컬럼 순서대로 정렬한다.
      *
      * <p>{@link MigrationTableInfo#getValidationTargets()}에서 컬럼 목록을 가져와
-     * {@code TABLE_ID}, {@code TABLE_NM}, {@code COL_ORD}, {@code COL_NM},
+     * {@code TABLE_OWNER}, {@code TABLE_ID}, {@code COL_ORD}, {@code COL_NM},
      * {@code DATA_TYPE}을 검증한다. 컬럼 순번과 컬럼명의 중복도 허용하지 않는다.</p>
      *
      * @param table 이관 대상 테이블과 컬럼 관계 정보
@@ -323,13 +328,10 @@ public final class SybaseIQUnloadWorker {
             if (target == null) {
                 throw new ExtractException("ValidationTarget에 null 항목이 있습니다.");
             }
-            if (!Objects.equals(table.getTableId(), target.getTableId())) {
-                throw new ExtractException("TABLE_ID가 일치하지 않습니다: "
-                        + target.getTableId());
-            }
-            if (!table.getTableNm().equalsIgnoreCase(target.getTableNm())) {
-                throw new ExtractException("TABLE_NM이 일치하지 않습니다: "
-                        + target.getTableNm());
+            if (!SqlUtil.identifiersEqual(table.getTableOwner(), target.getTableOwner())||
+                !SqlUtil.identifiersEqual(table.getTableId(), target.getTableId())) {
+                throw new ExtractException("TABLE_OWNER/TABLE_ID가 일치하지 않습니다: "
+                        + target.getTableOwner() + "." + target.getTableId());
             }
             if (target.getColOrd() <= 0 || !ordinals.add(target.getColOrd())) {
                 throw new ExtractException("잘못되거나 중복된 COL_ORD: "
@@ -354,13 +356,12 @@ public final class SybaseIQUnloadWorker {
      * 일치하지 않으면 추출을 중단한다.</p>
      *
      * @param table 이관 대상 테이블 정보
-     * @param columns {@code COL_ORD} 순서로 정렬된 컬럼 정보
+     * @param hasBinary 컬럼 정보에 바이너리 타입이 포함되어 있는지 여부
      * @throws ExtractException {@code LOB_YN}과 바이너리 컬럼 존재 여부가 다를 때
      */
-    private void validateLobMetadata(MigrationTableInfo table, List<ValidationTarget> columns)
+    private void validateLobMetadata(MigrationTableInfo table, boolean hasBinary)
             throws ExtractException {
         boolean lobYn = "Y".equalsIgnoreCase(table.getLobYn());
-        boolean hasBinary = hasBinaryColumn(columns);
         if (lobYn != hasBinary) {
             throw new ExtractException("LOB_YN과 바이너리 컬럼 정보가 일치하지 않습니다: table="
                     + table.getTableNm() + ", lobYn=" + table.getLobYn()
@@ -392,6 +393,12 @@ public final class SybaseIQUnloadWorker {
         return value;
     }
 
+    private String qualifiedTableName(MigrationTableInfo table) throws ExtractException {
+        String owner = validateIdentifier(table.getTableOwner(), "table owner");
+        String tableName = validateIdentifier(table.getTableNm(), "table name");
+        return owner + "." + tableName;
+    }
+
     /**
      * 테이블별 추출 디렉터리명을 {@code TABLE_NM_PROC_ORD} 형식으로 생성한다.
      *
@@ -416,12 +423,15 @@ public final class SybaseIQUnloadWorker {
     /** Worker가 접근하는 공유 경로에 테이블별 추출 디렉터리를 생성한다. */
     private void createWorkerDirectories(
             MigrationStoragePaths storagePaths,
-            String directoryName) throws ExtractException {
+            String directoryName,
+            boolean hasBinaryColumns) throws ExtractException {
         try {
             LOGGER.debug("Worker data export directory ready: {}",
                     storagePaths.createWorkerDataDirectory(directoryName));
-            LOGGER.debug("Worker BLOB export directory ready: {}",
-                    storagePaths.createWorkerBlobDirectory(directoryName));
+            if (hasBinaryColumns) {
+                LOGGER.debug("Worker BLOB export directory ready: {}",
+                        storagePaths.createWorkerBlobDirectory(directoryName));
+            }
         } catch (IOException | RuntimeException e) {
             throw new ExtractException(
                     "Worker export directory creation failed: " + directoryName, e);

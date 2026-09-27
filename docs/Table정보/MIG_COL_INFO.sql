@@ -1,0 +1,23 @@
+CREATE TABLE `MIG_COL_INFO` (
+  `TABLE_OWNER` varchar(30) NOT NULL COMMENT '테이블OWNER(PK1)',
+  `TABLE_ID` varchar(30) NOT NULL COMMENT '테이블ID(PK2)',
+  `COL_ID` varchar(128) NOT NULL COMMENT '컬럼ID(PK3)',
+  `COL_ORD` decimal(5,0) NOT NULL COMMENT '컬럼순번',
+  `COL_NM` varchar(128) NOT NULL COMMENT '컬럼명',
+  `DATA_TYPE` varchar(30) NOT NULL COMMENT '데이터타입',
+  `PK_YN` char(1) NOT NULL DEFAULT 'N' COMMENT 'PK여부',
+  `NULL_YN` char(1) NOT NULL DEFAULT 'N' COMMENT 'NULL여부',
+  `SUM_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '합계검증여부',
+  `MIN_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '최소검증여부',
+  `MAX_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '최대검증여부',
+  `AVG_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '평균검증여부',
+  `HASH_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '행값체크섬 검증여부',
+  `DIST_CNT_YN` char(1) NOT NULL DEFAULT 'N' COMMENT '고유값수 검증여부',
+  `NULL_CNT_YN` char(1) NOT NULL DEFAULT 'N' COMMENT 'NULL건수 검증여부',
+  `REG_ID` varchar(20) NOT NULL COMMENT '등록자',
+  `REG_DTM` datetime NOT NULL DEFAULT current_timestamp() COMMENT '등록일시',
+  `LST_ADJPRN_ID` varchar(20) NOT NULL COMMENT '최종수정자',
+  `LST_ADJ_DTM` datetime NOT NULL DEFAULT current_timestamp() COMMENT '최종수정일시',
+  PRIMARY KEY (`TABLE_OWNER`,`TABLE_ID`,`COL_ID`),
+  KEY `IX_MIG_COL_INFO_01` (`TABLE_OWNER`,`TABLE_ID`,`COL_ORD`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC COMMENT='이관대상 테이블의 컬럼속성 및 검증여부 관리';

@@ -1,47 +1,41 @@
 package com.migration.metadata;
 
-import java.math.BigDecimal;
-
-/** GPCL_MIG_VRF_RESULT에 저장할 AS-IS 컬럼 검증 결과. */
+/** MIG_VRF_RESULT에 저장하거나 비교할 컬럼별 검증 집계값. */
 public final class SourceValidationResult {
     private final String colId;
-    private final BigDecimal rowCount;
-    private final BigDecimal sum;
-    private final BigDecimal min;
-    private final BigDecimal max;
-    private final BigDecimal avg;
-    private final BigDecimal byteLength;
-    private final BigDecimal distinctCount;
-    private final BigDecimal nullCount;
+    private final String rowCount;
+    private final String sum;
+    private final String min;
+    private final String max;
+    private final String avg;
+    private final String distinctCount;
+    private final String nullCount;
 
     public SourceValidationResult(
             String colId,
-            BigDecimal rowCount,
-            BigDecimal sum,
-            BigDecimal min,
-            BigDecimal max,
-            BigDecimal avg,
-            BigDecimal byteLength,
-            BigDecimal distinctCount,
-            BigDecimal nullCount) {
+            String rowCount,
+            String sum,
+            String min,
+            String max,
+            String avg,
+            String distinctCount,
+            String nullCount) {
         this.colId = colId;
         this.rowCount = rowCount;
         this.sum = sum;
         this.min = min;
         this.max = max;
         this.avg = avg;
-        this.byteLength = byteLength;
         this.distinctCount = distinctCount;
         this.nullCount = nullCount;
     }
 
     public String getColId() { return colId; }
-    public BigDecimal getRowCount() { return rowCount; }
-    public BigDecimal getSum() { return sum; }
-    public BigDecimal getMin() { return min; }
-    public BigDecimal getMax() { return max; }
-    public BigDecimal getAvg() { return avg; }
-    public BigDecimal getByteLength() { return byteLength; }
-    public BigDecimal getDistinctCount() { return distinctCount; }
-    public BigDecimal getNullCount() { return nullCount; }
+    public String getRowCount() { return rowCount; }
+    public String getSum() { return sum; }
+    public String getMin() { return min; }
+    public String getMax() { return max; }
+    public String getAvg() { return avg; }
+    public String getDistinctCount() { return distinctCount; }
+    public String getNullCount() { return nullCount; }
 }

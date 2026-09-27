@@ -1,0 +1,97 @@
+생성된 소스테이블의 PK추가할것
+ --> PK가 없는 테이블은 존재할 수 없음. LOB을 보유한 테이블은 PK 필수임.
+ --> 생성된 타켓테이블의 PK인덱스 생성할 것(PK는 존재해야 함)
+ 
+생성된 소스테이블의 불필요한 인덱스 삭제할것(불필요함. 공간만차지함)
+ --> 대용량 이관 시 데이터 적재(LOAD TABLE) 속도를 높이기 위해 인덱스 삭제 작업을 수행 중이신 경우,
+     _FP 인덱스는 삭제 대상이 아니며 그대로 유지하셔야 합니다.
+
+소스테이블 및 타켓테이블의 TB_LOB_007 수정함.
+    ALTER TABLE DWDB.TB_LOB_007 
+    ADD CONSTRAINT PK_TB_LOB_007 PRIMARY KEY (SEQ_NO);
+
+추출/적재 결과를 비교하기위한 MIG_VRF_RESULT 테이블의 컬럼을 varchar(38)로 일괄 변경함.
+
+;
+
+/*
+select *
+  from SYS.SYSTAB
+ WHERE 1=1
+   AND table_name = 'TB_LOB_007'
+   and creator = 101 -- 'DWDB'
+;
+
+select *
+  from SYS.SYSCOLUMN
+ WHERE 1=1 
+   AND table_id = 1727 -- 'TB_LOB_007'
+;
+
+select *
+  from SYS.SYSUSER
+ WHERE 1=1
+   AND user_name = 'DWDB'
+;
+*/
+;
+
+insert into MIG_TBL_INFO
+     ( TABLE_OWNER
+     , TABLE_ID, PROC_ORD, TASK_ID
+     , SRC_DB_PREFIX, TGT_DB_PREFIX
+     , MIG_LOAD_MODE, LOB_YN, USE_YN, MNGR_ID, TABLE_NM, MIG_COND
+     , BIZ_AREA_CD, SUBJ_AREA_CD, GRP1_CD, GRP2_CD, GRP3_CD, GRP4_CD,GRP5_CD
+     , REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM )
+select 'DWDB' as TABLE_OWNER
+     , TABLE_ID, PROC_ORD, TASK_ID
+     , 'DWDB' as SRC_DB_PREFIX
+     , 'MIGTGT' as TGT_DB_PREFIX
+     , 'T' as MIG_LOAD_MODE
+     , LOB_YN, USE_YN, MNGR_ID, TABLE_NM, MIG_COND
+     , BIZ_AREA_CD, SUBJ_AREA_CD, GRP1_CD, GRP2_CD, GRP3_CD, GRP4_CD,GRP5_CD
+     , REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM	
+  from GPCL_MIG_TABLE
+ where 1=1
+ order by TABLE_ID, PROC_ORD 
+;
+
+insert MIG_COL_INFO
+     ( TABLE_OWNER
+     , TABLE_ID, COL_ID, COL_ORD, COL_NM, DATA_TYPE
+     , PK_YN, NULL_YN
+     , SUM_YN, MIN_YN, MAX_YN, AVG_YN, HASH_YN, DIST_CNT_YN, NULL_CNT_YN
+     , REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM )
+SELECT trim(u.user_name) AS TABLE_OWNER
+     , trim(t.table_name) AS TABLE_ID
+     , trim(c.column_name) AS COL_ID
+     , trim(c.column_id) AS COL_ORD
+     , trim(c.column_name) AS COL_NM
+     , case
+           when upper(trim(d.domain_name)) in ('DECIMAL', 'DEC', 'NUMERIC') then
+               upper(trim(d.domain_name))
+               || '(' || cast(c.width as varchar(10))
+               || ', ' || cast(coalesce(c.scale, 0) as varchar(10)) || ')'
+           when upper(trim(d.domain_name)) in (
+                   'CHAR', 'CHARACTER', 'VARCHAR', 'CHARACTER VARYING',
+                   'NCHAR', 'NVARCHAR', 'BINARY', 'VARBINARY') then
+               upper(trim(d.domain_name))
+               || '(' || cast(c.width as varchar(10)) || ')'
+           else upper(trim(d.domain_name))
+       end AS DATA_TYPE
+     , trim(c.pkey) AS PK_YN
+     , trim(c.nulls) AS NULL_YN
+     , 'N' as SUM_YN, 'N' as MIN_YN, 'N' as MAX_YN
+     , 'N' as AVG_YN, 'N' as HASH_YN, 'N' as DIST_CNT_YN, 'N' as NULL_CNT_YN
+     , 'EXCEL' as REG_ID, now() as REG_DTM, 'EXCEL' as LST_ADJPRN_ID, now() as LST_ADJ_DTM 
+  FROM SYS.SYSTAB t JOIN SYS.SYSCOLUMN c ON t.table_id = c.table_id
+                         JOIN SYS.SYSDOMAIN d ON c.domain_id = d.domain_id
+                    JOIN SYS.SYSUSER u ON t.creator = u.user_id
+ WHERE 1=1
+   -- AND t.table_name = 'TB_LOB_007'
+   AND u.user_name = 'DWDB'     -- 필요 시 테이블 소유자 지정
+ ORDER BY u.user_name, t.table_name, c.column_id
+;
+
+commit
+;

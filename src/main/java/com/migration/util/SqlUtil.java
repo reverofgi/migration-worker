@@ -63,4 +63,11 @@ public final class SqlUtil {
 
         return true;
     }
+
+    /** DB 메타데이터 식별자를 후행 공백과 대소문자 차이 없이 비교한다. */
+    public static boolean identifiersEqual(String left, String right) {
+        return left != null
+                && right != null
+                && left.trim().equalsIgnoreCase(right.trim());
+    }
 }

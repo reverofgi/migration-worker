@@ -1,6 +1,6 @@
 package com.migration.metadata;
 
-/** GPCL_CM_CD_VAL에서 조회한 Migration 설정 항목. */
+/** GPCL_CM_CD_VAL에서 조회한 Migration 설정 key/value 항목. */
 public final class MigrationProperty {
     private String key;
     private String value;

@@ -3,7 +3,7 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.migration.metadata.SybaseIQMapper">
     <!-- tableName/colNm은 Java에서 SQL identifier 검증을 마친 값만 전달한다. -->
-    <select id="selectSourceValidationAggregate" resultType="java.util.Map">
+    <select id="selectValidationAggregate" resultType="java.util.Map">
         SELECT COUNT(*) AS ROW_COUNT
         <foreach collection="targets" item="target" index="index">
             <if test="target.sumYn">
@@ -17,9 +17,6 @@
             </if>
             <if test="target.avgYn">
                 , AVG(${target.colNm}) AS C${index}_AVG
-            </if>
-            <if test="target.byteLenYn">
-                , SUM(BYTE_LENGTH(${target.colNm})) AS C${index}_BYTE_LEN
             </if>
             <if test="target.distCntYn">
                 , COUNT(DISTINCT ${target.colNm}) AS C${index}_DIST_CNT

@@ -33,6 +33,10 @@ class MigrationStoragePathsTest {
                 paths.databaseBlobDirectory("EMP_1"));
         assertTrue(Files.isDirectory(paths.createWorkerDataDirectory("EMP_1")));
         assertTrue(Files.isDirectory(paths.createWorkerBlobDirectory("EMP_1")));
+        assertEquals(workerDataRoot.resolve("EMP_1").toAbsolutePath().normalize(),
+                paths.workerDataDirectory("EMP_1"));
+        assertEquals(workerBlobRoot.resolve("EMP_1").toAbsolutePath().normalize(),
+                paths.workerBlobDirectory("EMP_1"));
     }
 
     @Test
@@ -54,5 +58,7 @@ class MigrationStoragePathsTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> paths.databaseDataDirectory("../outside"));
+        assertThrows(IllegalArgumentException.class,
+                () -> paths.workerDataFile("safe", "../outside.dat"));
     }
 }

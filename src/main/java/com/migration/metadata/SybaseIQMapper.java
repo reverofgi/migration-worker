@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface SybaseIQMapper {
-    Map<String, Object> selectSourceValidationAggregate(
+    Map<String, Object> selectValidationAggregate(
             @Param("tableName") String tableName,
             @Param("migCond") String migCond,
             @Param("targets") List<ValidationTarget> targets);

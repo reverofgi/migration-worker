@@ -3,17 +3,18 @@ package com.migration.metadata;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** GPCL_MIG_TABLE에서 조회한 이관 테이블 메타데이터. */
+/** MIG_TBL_INFO에서 조회한 이관 테이블 메타데이터. */
 public class MigrationTableInfo {
+    private String tableOwner;
     private String tableId;
     private int procOrd;
     private String taskId;
+    private String srcDbPrefix;
+    private String tgtDbPrefix;
     private String tableNm;
     private String migCond;
-    private String migMode;
+    private String migLoadMode;
     private String lobYn;
-    private String migModeRsn;
-    private int parallelDgr;
     private String mngrId;
     private String bizAreaCd;
     private String subjAreaCd;
@@ -22,13 +23,14 @@ public class MigrationTableInfo {
     private String grp3Cd;
     private String grp4Cd;
     private String grp5Cd;
-    private String clnupTpCd;
     private String useYn;
     private String regId;
     private LocalDateTime regDtm;
     private String lstAdjprnId;
     private LocalDateTime lstAdjDtm;
     private List<ValidationTarget> validationTargets;
+
+    public String getTableOwner() { return tableOwner; }
 
     public String getTableId() { return tableId; }
     // public void setTableId(String tableId) { this.tableId = tableId; }
@@ -39,23 +41,20 @@ public class MigrationTableInfo {
     public String getTaskId() { return taskId; }
     // public void setTaskId(String taskId) { this.taskId = taskId; }
 
+    public String getSrcDbPrefix() { return srcDbPrefix; }
+
+    public String getTgtDbPrefix() { return tgtDbPrefix; }
+
     public String getTableNm() { return tableNm; }
     // public void setTableNm(String tableNm) { this.tableNm = tableNm; }
 
     public String getMigCond() { return migCond; }
     // public void setMigCond(String migCond) { this.migCond = migCond; }
 
-    public String getMigMode() { return migMode; }
-    // public void setMigMode(String migMode) { this.migMode = migMode; }
+    public String getMigLoadMode() { return migLoadMode; }
 
     public String getLobYn() { return lobYn; }
     // public void setLobYn(String lobYn) { this.lobYn = lobYn; }
-
-    public String getMigModeRsn() { return migModeRsn; }
-    // public void setMigModeRsn(String migModeRsn) { this.migModeRsn = migModeRsn; }
-
-    public int getParallelDgr() { return parallelDgr; }
-    // public void setParallelDgr(int parallelDgr) { this.parallelDgr = parallelDgr; }
 
     public String getMngrId() { return mngrId; }
     // public void setMngrId(String mngrId) { this.mngrId = mngrId; }
@@ -81,9 +80,6 @@ public class MigrationTableInfo {
     public String getGrp5Cd() { return grp5Cd; }
     // public void setGrp5Cd(String grp5Cd) { this.grp5Cd = grp5Cd; }
 
-    public String getClnupTpCd() { return clnupTpCd; }
-    // public void setClnupTpCd(String clnupTpCd) { this.clnupTpCd = clnupTpCd; }
-
     public String getUseYn() { return useYn; }
     // public void setUseYn(String useYn) { this.useYn = useYn; }
 
@@ -99,7 +95,7 @@ public class MigrationTableInfo {
     public LocalDateTime getLstAdjDtm() { return lstAdjDtm; }
     // public void setLstAdjDtm(LocalDateTime lstAdjDtm) { this.lstAdjDtm = lstAdjDtm; }
 
-    /** TABLE_ID로 조회한 GPCL_MIG_VRF_TARGET 컬럼 목록. */
+    /** TABLE_OWNER와 TABLE_ID로 조회한 MIG_COL_INFO 컬럼 목록. */
     public List<ValidationTarget> getValidationTargets() { return validationTargets; }
     // public void setValidationTargets(List<ValidationTarget> validationTargets) {
     //     this.validationTargets = validationTargets;

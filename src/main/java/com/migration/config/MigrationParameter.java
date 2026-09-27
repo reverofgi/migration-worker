@@ -7,8 +7,7 @@ import java.util.Objects;
 /**
  * Worker 한 번의 실행에 사용하는 불변 런타임 설정.
  *
- * 하나의 이관 배치에 필요한 CLI 및 런타임 값을 보관한다. 데이터베이스 설정은
- * GPCL_CM_CD_VAL의 컬럼 규칙이 제공될 때까지 명시적인 확장 지점으로 유지한다.
+ * 하나의 이관 배치에 필요한 CLI 및 런타임 값을 보관한다.
  */
 public final class MigrationParameter {
 

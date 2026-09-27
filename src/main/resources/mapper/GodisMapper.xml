@@ -8,15 +8,16 @@
     </resultMap>
 
     <resultMap id="migrationTableInfoMap" type="com.migration.metadata.MigrationTableInfo">
+        <result property="tableOwner" column="TABLE_OWNER"/>
         <result property="tableId" column="TABLE_ID"/>
         <result property="procOrd" column="PROC_ORD"/>
         <result property="taskId" column="TASK_ID"/>
+        <result property="srcDbPrefix" column="SRC_DB_PREFIX"/>
+        <result property="tgtDbPrefix" column="TGT_DB_PREFIX"/>
         <result property="tableNm" column="TABLE_NM"/>
         <result property="migCond" column="MIG_COND"/>
-        <result property="migMode" column="MIG_MODE"/>
+        <result property="migLoadMode" column="MIG_LOAD_MODE"/>
         <result property="lobYn" column="LOB_YN"/>
-        <result property="migModeRsn" column="MIG_MODE_RSN"/>
-        <result property="parallelDgr" column="PARALLEL_DGR"/>
         <result property="mngrId" column="MNGR_ID"/>
         <result property="bizAreaCd" column="BIZ_AREA_CD"/>
         <result property="subjAreaCd" column="SUBJ_AREA_CD"/>
@@ -25,22 +26,21 @@
         <result property="grp3Cd" column="GRP3_CD"/>
         <result property="grp4Cd" column="GRP4_CD"/>
         <result property="grp5Cd" column="GRP5_CD"/>
-        <result property="clnupTpCd" column="CLNUP_TP_CD"/>
         <result property="useYn" column="USE_YN"/>
         <result property="regId" column="REG_ID"/>
         <result property="regDtm" column="REG_DTM"/>
         <result property="lstAdjprnId" column="LST_ADJPRN_ID"/>
         <result property="lstAdjDtm" column="LST_ADJ_DTM"/>
         <collection property="validationTargets"
-                    column="TABLE_ID"
+                    column="{tableOwner=TABLE_OWNER,tableId=TABLE_ID}"
                     select="selectValidationTargets"/>
     </resultMap>
 
     <resultMap id="validationTargetMap" type="com.migration.metadata.ValidationTarget">
+        <result property="tableOwner" column="TABLE_OWNER"/>
         <result property="tableId" column="TABLE_ID"/>
         <result property="colId" column="COL_ID"/>
         <result property="colOrd" column="COL_ORD"/>
-        <result property="tableNm" column="TABLE_NM"/>
         <result property="colNm" column="COL_NM"/>
         <result property="dataType" column="DATA_TYPE"/>
         <result property="pkYn" column="PK_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
@@ -50,7 +50,6 @@
         <result property="maxYn" column="MAX_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
         <result property="avgYn" column="AVG_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
         <result property="hashYn" column="HASH_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
-        <result property="byteLenYn" column="BYTE_LEN_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
         <result property="distCntYn" column="DIST_CNT_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
         <result property="nullCntYn" column="NULL_CNT_YN" typeHandler="com.migration.metadata.YnBooleanTypeHandler"/>
         <result property="regId" column="REG_ID"/>
@@ -59,14 +58,48 @@
         <result property="lstAdjDtm" column="LST_ADJ_DTM"/>
     </resultMap>
 
-    <select id="selectMigrationTable" resultMap="migrationTableInfoMap">
-        SELECT TABLE_ID, PROC_ORD, TASK_ID, TABLE_NM, MIG_COND
-             , MIG_MODE, LOB_YN, MIG_MODE_RSN, PARALLEL_DGR, MNGR_ID
-             , BIZ_AREA_CD, SUBJ_AREA_CD, GRP1_CD, GRP2_CD, GRP3_CD, GRP4_CD, GRP5_CD
-             , CLNUP_TP_CD, USE_YN, REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM
-          FROM GPCL_MIG_TABLE
+    <resultMap id="migrationDatabasePrefixesMap"
+               type="com.migration.metadata.MigrationDatabasePrefixes">
+        <result property="sourcePrefix" column="SRC_DB_PREFIX"/>
+        <result property="targetPrefix" column="TGT_DB_PREFIX"/>
+    </resultMap>
+
+    <resultMap id="sourceValidationResultMap"
+               type="com.migration.metadata.SourceValidationResult">
+        <constructor>
+            <arg column="COL_ID" javaType="java.lang.String"/>
+            <arg column="SRC_ROW_CNT" javaType="java.lang.String"/>
+            <arg column="SRC_SUM_VAL" javaType="java.lang.String"/>
+            <arg column="SRC_MIN_VAL" javaType="java.lang.String"/>
+            <arg column="SRC_MAX_VAL" javaType="java.lang.String"/>
+            <arg column="SRC_AVG_VAL" javaType="java.lang.String"/>
+            <arg column="SRC_DIST_CNT_VAL" javaType="java.lang.String"/>
+            <arg column="SRC_NULL_CNT_VAL" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <select id="selectMigrationDatabasePrefixes" resultMap="migrationDatabasePrefixesMap">
+        SELECT DISTINCT TRIM(SRC_DB_PREFIX) AS SRC_DB_PREFIX
+             , TRIM(TGT_DB_PREFIX) AS TGT_DB_PREFIX
+          FROM MIG_TBL_INFO
          WHERE TASK_ID = #{taskId}
-         ORDER BY TABLE_ID, PROC_ORD
+    </select>
+
+    <select id="selectMigrationTable" resultMap="migrationTableInfoMap">
+        SELECT TRIM(TABLE_OWNER) AS TABLE_OWNER
+             , TRIM(TABLE_ID) AS TABLE_ID
+             , PROC_ORD
+             , TRIM(TASK_ID) AS TASK_ID
+             , TRIM(SRC_DB_PREFIX) AS SRC_DB_PREFIX
+             , TRIM(TGT_DB_PREFIX) AS TGT_DB_PREFIX
+             , TRIM(TABLE_NM) AS TABLE_NM
+             , MIG_COND
+             , MIG_LOAD_MODE, LOB_YN, MNGR_ID
+             , BIZ_AREA_CD, SUBJ_AREA_CD, GRP1_CD, GRP2_CD, GRP3_CD, GRP4_CD, GRP5_CD
+             , USE_YN, REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM
+          FROM MIG_TBL_INFO
+         WHERE TASK_ID = #{taskId}
+         ORDER BY TABLE_OWNER, TABLE_ID, PROC_ORD
     </select>
 
     <select id="selectMigrationProperties" resultMap="migrationPropertyMap">
@@ -77,28 +110,43 @@
     </select>
 
     <select id="selectValidationTargets" resultMap="validationTargetMap">
-        SELECT TABLE_ID, COL_ID, COL_ORD, TABLE_NM, COL_NM, DATA_TYPE
+        SELECT TRIM(TABLE_OWNER) AS TABLE_OWNER
+             , TRIM(TABLE_ID) AS TABLE_ID
+             , TRIM(COL_ID) AS COL_ID
+             , COL_ORD
+             , TRIM(COL_NM) AS COL_NM
+             , TRIM(DATA_TYPE) AS DATA_TYPE
              , PK_YN, NULL_YN, SUM_YN, MIN_YN, MAX_YN, AVG_YN
-             , HASH_YN, BYTE_LEN_YN, DIST_CNT_YN, NULL_CNT_YN
+             , HASH_YN, DIST_CNT_YN, NULL_CNT_YN
              , REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM
-          FROM GPCL_MIG_VRF_TARGET
-         WHERE TABLE_ID = #{tableId}
-         ORDER BY TABLE_ID, COL_ORD
+          FROM MIG_COL_INFO
+         WHERE TABLE_OWNER = #{tableOwner}
+           AND TABLE_ID = #{tableId}
+         ORDER BY TABLE_OWNER, TABLE_ID, COL_ORD
     </select>
 
+    <!-- MIG_COND는 결과 테이블에 없으므로 MIG_TBL_INFO의 조건 식별키로 삭제한다. -->
+    <delete id="deleteValidationResults">
+        DELETE FROM MIG_VRF_RESULT
+         WHERE EXE_ORD = #{execOrd}
+           AND TABLE_OWNER = #{tableOwner}
+           AND TABLE_ID = #{tableId}
+           AND PROC_ORD = #{procOrd}
+    </delete>
+
     <insert id="upsertSourceValidationResults">
-        INSERT INTO GPCL_MIG_VRF_RESULT (
-            EXE_ORD, TABLE_ID, PROC_ORD, COL_ID, MNGR_ID,
+        INSERT INTO MIG_VRF_RESULT (
+            EXE_ORD, TABLE_OWNER, TABLE_ID, PROC_ORD, COL_ID, MNGR_ID,
             SRC_ROW_CNT, SRC_SUM_VAL, SRC_MIN_VAL, SRC_MAX_VAL, SRC_AVG_VAL,
-            SRC_HASH_VAL, SRC_BYTE_LEN_VAL, SRC_DIST_CNT_VAL, SRC_NULL_CNT_VAL,
+            SRC_HASH_VAL, SRC_DIST_CNT_VAL, SRC_NULL_CNT_VAL,
             VRF_STAT_CD, CONF_STAT_CD,
             REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM
         ) VALUES
         <foreach collection="results" item="result" separator=",">
             (
-                #{execOrd}, #{tableId}, #{procOrd}, #{result.colId}, #{mngrId},
+                #{execOrd}, #{tableOwner}, #{tableId}, #{procOrd}, #{result.colId}, #{mngrId},
                 #{result.rowCount}, #{result.sum}, #{result.min}, #{result.max}, #{result.avg},
-                NULL, #{result.byteLength}, #{result.distinctCount}, #{result.nullCount},
+                NULL, #{result.distinctCount}, #{result.nullCount},
                 '30', '10', #{auditId}, NOW(), #{auditId}, NOW()
             )
         </foreach>
@@ -110,10 +158,55 @@
             SRC_MAX_VAL = VALUES(SRC_MAX_VAL),
             SRC_AVG_VAL = VALUES(SRC_AVG_VAL),
             SRC_HASH_VAL = NULL,
-            SRC_BYTE_LEN_VAL = VALUES(SRC_BYTE_LEN_VAL),
             SRC_DIST_CNT_VAL = VALUES(SRC_DIST_CNT_VAL),
             SRC_NULL_CNT_VAL = VALUES(SRC_NULL_CNT_VAL),
             VRF_STAT_CD = '30',
+            CONF_STAT_CD = '10',
+            CONF_DTM = NULL,
+            LST_ADJPRN_ID = VALUES(LST_ADJPRN_ID),
+            LST_ADJ_DTM = NOW()
+    </insert>
+
+    <select id="selectSourceValidationResults" resultMap="sourceValidationResultMap">
+        SELECT COL_ID
+             , SRC_ROW_CNT, SRC_SUM_VAL, SRC_MIN_VAL, SRC_MAX_VAL, SRC_AVG_VAL
+             , SRC_DIST_CNT_VAL, SRC_NULL_CNT_VAL
+          FROM MIG_VRF_RESULT
+         WHERE EXE_ORD = #{execOrd}
+           AND TABLE_OWNER = #{tableOwner}
+           AND TABLE_ID = #{tableId}
+           AND PROC_ORD = #{procOrd}
+         ORDER BY COL_ID
+    </select>
+
+    <insert id="upsertTargetValidationResults">
+        INSERT INTO MIG_VRF_RESULT (
+            EXE_ORD, TABLE_OWNER, TABLE_ID, PROC_ORD, COL_ID, MNGR_ID,
+            TGT_ROW_CNT, TGT_SUM_VAL, TGT_MIN_VAL, TGT_MAX_VAL, TGT_AVG_VAL,
+            TGT_HASH_VAL, TGT_DIST_CNT_VAL, TGT_NULL_CNT_VAL,
+            VRF_STAT_CD, CONF_STAT_CD,
+            REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM
+        ) VALUES
+        <foreach collection="results" item="result" separator=",">
+            (
+                #{execOrd}, #{tableOwner}, #{tableId}, #{procOrd}, #{result.colId}, #{mngrId},
+                #{result.rowCount}, #{result.sum}, #{result.min}, #{result.max}, #{result.avg},
+                NULL, #{result.distinctCount}, #{result.nullCount},
+                #{result.verificationStatusCode}, '10',
+                #{auditId}, NOW(), #{auditId}, NOW()
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            MNGR_ID = VALUES(MNGR_ID),
+            TGT_ROW_CNT = VALUES(TGT_ROW_CNT),
+            TGT_SUM_VAL = VALUES(TGT_SUM_VAL),
+            TGT_MIN_VAL = VALUES(TGT_MIN_VAL),
+            TGT_MAX_VAL = VALUES(TGT_MAX_VAL),
+            TGT_AVG_VAL = VALUES(TGT_AVG_VAL),
+            TGT_HASH_VAL = NULL,
+            TGT_DIST_CNT_VAL = VALUES(TGT_DIST_CNT_VAL),
+            TGT_NULL_CNT_VAL = VALUES(TGT_NULL_CNT_VAL),
+            VRF_STAT_CD = VALUES(VRF_STAT_CD),
             CONF_STAT_CD = '10',
             CONF_DTM = NULL,
             LST_ADJPRN_ID = VALUES(LST_ADJPRN_ID),

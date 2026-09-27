@@ -57,6 +57,26 @@ public final class MigrationStoragePaths {
         return createWorkerDirectory(workerBlobRoot, directoryName);
     }
 
+    public Path workerDataFile(String directoryName, String fileName) {
+        validateDirectoryName(directoryName);
+        validateFileName(fileName);
+        Path directory = workerDataDirectory(directoryName);
+        Path file = directory.resolve(fileName).normalize();
+        if (!directory.startsWith(workerDataRoot) || !file.startsWith(directory)) {
+            throw new IllegalArgumentException(
+                    "Worker data file escapes its configured root: " + file);
+        }
+        return file;
+    }
+
+    public Path workerDataDirectory(String directoryName) {
+        return resolveWorkerDirectory(workerDataRoot, directoryName);
+    }
+
+    public Path workerBlobDirectory(String directoryName) {
+        return resolveWorkerDirectory(workerBlobRoot, directoryName);
+    }
+
     private static String validateDatabaseRoot(String value, String propertyName) {
         Objects.requireNonNull(value, propertyName);
         String normalized = value.trim().replaceAll("/+$", "");
@@ -109,10 +129,26 @@ public final class MigrationStoragePaths {
         return directory;
     }
 
+    private static Path resolveWorkerDirectory(Path root, String directoryName) {
+        validateDirectoryName(directoryName);
+        Path directory = root.resolve(directoryName).normalize();
+        if (!directory.startsWith(root)) {
+            throw new IllegalArgumentException(
+                    "Worker export directory escapes its configured root: " + directory);
+        }
+        return directory;
+    }
+
     private static void validateDirectoryName(String directoryName) {
         if (directoryName == null || !directoryName.matches("[A-Za-z0-9_.-]+")) {
             throw new IllegalArgumentException(
                     "Invalid export directory name: " + directoryName);
+        }
+    }
+
+    private static void validateFileName(String fileName) {
+        if (fileName == null || !fileName.matches("[A-Za-z0-9_.-]+")) {
+            throw new IllegalArgumentException("Invalid export file name: " + fileName);
         }
     }
 }

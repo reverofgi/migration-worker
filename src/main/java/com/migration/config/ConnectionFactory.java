@@ -8,7 +8,7 @@ import java.sql.SQLException;
  * Batch Group에서 사용할 세 종류의 논리 연결을 생성한다.
  *
  * GODIS 연결정보는 프로그램 상수로 관리한다. AS-IS와 TO-BE 연결정보는
- * 프로그램 시작 시 초기화된 MigrationProperties에서 읽는다.
+ * TASK_ID 메타데이터의 DB PREFIX와 MigrationProperties 키를 조합해 읽는다.
  */
 public final class ConnectionFactory {
     private static final String GODIS_JDBC_URL = "jdbc:mariadb://192.168.0.122:3306/KBADW";
@@ -33,18 +33,25 @@ public final class ConnectionFactory {
         return DriverManager.getConnection(godisJdbcUrl, godisUser, godisPassword);
     }
 
-    public Connection createSourceConnection() throws SQLException {
+    public Connection createSourceConnection(String databasePrefix) throws SQLException {
         return DriverManager.getConnection(
-                MigrationProperties.getRequired("SOURCE_JDBC_URL"),
-                MigrationProperties.getRequired("SOURCE_USER"),
-                MigrationProperties.getRequired("SOURCE_PWD"));
+                MigrationProperties.getRequired(propertyKey(databasePrefix, "SOURCE_JDBC_URL")),
+                MigrationProperties.getRequired(propertyKey(databasePrefix, "SOURCE_USER")),
+                MigrationProperties.getRequired(propertyKey(databasePrefix, "SOURCE_PWD")));
     }
 
-    public Connection createTargetConnection() throws SQLException {
+    public Connection createTargetConnection(String databasePrefix) throws SQLException {
         return DriverManager.getConnection(
-                MigrationProperties.getRequired("TARGET_JDBC_URL"),
-                MigrationProperties.getRequired("TARGET_USER"),
-                MigrationProperties.getRequired("TARGET_PWD"));
+                MigrationProperties.getRequired(propertyKey(databasePrefix, "TARGET_JDBC_URL")),
+                MigrationProperties.getRequired(propertyKey(databasePrefix, "TARGET_USER")),
+                MigrationProperties.getRequired(propertyKey(databasePrefix, "TARGET_PWD")));
+    }
+
+    static String propertyKey(String databasePrefix, String suffix) throws SQLException {
+        if (databasePrefix == null || databasePrefix.isBlank()) {
+            throw new SQLException("Database property prefix must not be blank.");
+        }
+        return databasePrefix.trim() + "_" + suffix;
     }
 
     private static String requireMetaSetting(String value, String key) {

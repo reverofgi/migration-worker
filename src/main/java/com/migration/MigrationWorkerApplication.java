@@ -6,6 +6,8 @@ import com.migration.config.MigrationParameter;
 import com.migration.config.MigrationProperties;
 import com.migration.exception.MigrationException;
 import com.migration.exception.MetadataException;
+import com.migration.metadata.MigrationDatabasePrefixes;
+import com.migration.metadata.MigrationMetadataLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,21 +47,25 @@ public final class MigrationWorkerApplication {
     }
 
     private static void execute(String[] args) throws MigrationException, SQLException {
+        // 1. DB 조회 전에 명령행 파라미터를 검증한다.
+        MigrationParameter parameter = MigrationParameter.fromArguments(args);
         ConnectionFactory connectionFactory = new ConnectionFactory();
 
-        // 1. GODIS 연결은 Application이 생성하고 전체 실행 동안 소유한다.
-        try (Connection godisConnection = connectionFactory.createGodisConnection()) {
-            // 2. 명령행 파라미터를 읽어 메모리에 적재한다.
-            MigrationParameter parameter = MigrationParameter.fromArguments(args);
-
+        // 2. GODIS 연결은 Application이 생성하고 전체 실행 동안 소유한다.
+        try (Connection godisConnection = connectionFactory.createGodisConnection())
+        {
+            MigrationDatabasePrefixes databasePrefixes = new MigrationMetadataLoader()
+                    .loadDatabasePrefixes(godisConnection, parameter.getTaskId());
             initializeProperties(godisConnection);
 
-            // 3. 접속정보만 GODIS에서 조회하여 AS-IS와 TO-BE에 연결한다.
-            try (Connection sourceConnection = connectionFactory.createSourceConnection();
-                 Connection targetConnection = connectionFactory.createTargetConnection()) {
+            // 3. TASK_ID의 PREFIX와 공통코드 키를 조합하여 AS-IS/TO-BE에 연결한다.
+            try (Connection sourceConnection =
+                    connectionFactory.createSourceConnection(databasePrefixes.getSourcePrefix());
+                 Connection targetConnection =
+                    connectionFactory.createTargetConnection(databasePrefixes.getTargetPrefix()))
+            {
 
-                // 4. 프로젝트 전역 Properties를 초기화한다.
-                // 5. 생성된 실행 문맥과 Connection을 Worker에 전달한다.
+                // 4. 생성된 실행 문맥과 Connection을 Worker에 전달한다.
                 MigrationWorker worker = new MigrationWorker(
                         parameter,
                         godisConnection,

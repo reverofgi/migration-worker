@@ -27,8 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** AS-IS 추출 시점의 검증값을 계산하여 GPCL_MIG_VRF_RESULT에 저장한다. */
+/** AS-IS 추출 시점의 검증값을 계산하여 MIG_VRF_RESULT에 저장한다. */
 public final class UnloadResultVerifyWorker {
+    private static final int MAX_VALIDATION_VALUE_LENGTH = 38;
     private static final Logger LOGGER =
             LoggerFactory.getLogger(UnloadResultVerifyWorker.class);
 
@@ -47,14 +48,18 @@ public final class UnloadResultVerifyWorker {
 
     public void execute(MigrationTableInfo table) throws ValidationException {
         Objects.requireNonNull(table, "table");
-        List<ValidationTarget> targets = validateAndOrderTargets(table);
+        List<ValidationTarget> targets = enabledValidationTargets(
+                validateAndOrderTargets(table));
         rejectUnsupportedHash(targets);
 
         try {
-            List<SourceValidationResult> results = querySourceResults(table, targets);
-            saveSourceResults(table, results);
-            LOGGER.info("AS-IS 검증 결과를 저장했습니다: tableId={}, procOrd={}, columns={}",
-                    table.getTableId(), table.getProcOrd(), results.size());
+            List<SourceValidationResult> results = targets.isEmpty()
+                    ? List.of()
+                    : querySourceResults(table, targets);
+            int deletedRows = replaceSourceResults(table, results);
+            LOGGER.info(
+                    "AS-IS 검증 결과를 교체했습니다: tableId={}, procOrd={}, deleted={}, columns={}",
+                    table.getTableId(), table.getProcOrd(), deletedRows, results.size());
         } catch (SQLException e) {
             throw new ValidationException(
                     "AS-IS 검증 결과 처리 실패: " + table.getTableNm(), e);
@@ -64,7 +69,7 @@ public final class UnloadResultVerifyWorker {
     private List<SourceValidationResult> querySourceResults(
             MigrationTableInfo table,
             List<ValidationTarget> targets) throws SQLException, ValidationException {
-        String tableName = validateIdentifier(table.getTableNm(), "table name");
+        String tableName = qualifiedTableName(table);
         for (ValidationTarget target : targets) {
             validateIdentifier(target.getColNm(), "column name");
         }
@@ -74,7 +79,7 @@ public final class UnloadResultVerifyWorker {
             try (SqlSession session = factory.openSession(
                     ConnectionUtil.nonClosing(asisConnection))) {
                 Map<String, Object> aggregate = session.getMapper(SybaseIQMapper.class)
-                        .selectSourceValidationAggregate(
+                        .selectValidationAggregate(
                                 tableName, table.getMigCond(), targets);
                 if (aggregate == null || aggregate.isEmpty()) {
                     throw new ValidationException(
@@ -88,40 +93,30 @@ public final class UnloadResultVerifyWorker {
     }
 
     private List<SourceValidationResult> toSourceValidationResults(
-            List<ValidationTarget> targets,
-            Map<String, Object> aggregate) throws ValidationException {
-        BigDecimal rowCount = toBigDecimal(getAggregateValue(aggregate, "ROW_COUNT"),
-                "ROW_COUNT");
+            List<ValidationTarget> targets, Map<String, Object> aggregate) throws ValidationException {
+        String rowCount = toText(getAggregateValue(aggregate, "ROW_COUNT"), "ROW_COUNT");
         List<SourceValidationResult> results = new ArrayList<>(targets.size());
         for (int index = 0; index < targets.size(); index++) {
             ValidationTarget target = targets.get(index);
             String prefix = "C" + index;
-            BigDecimal sum = valueWhenEnabled(
-                    aggregate, prefix + "_SUM", target.isSumYn());
-            BigDecimal min = valueWhenEnabled(
-                    aggregate, prefix + "_MIN", target.isMinYn());
-            BigDecimal max = valueWhenEnabled(
-                    aggregate, prefix + "_MAX", target.isMaxYn());
-            BigDecimal avg = valueWhenEnabled(
-                    aggregate, prefix + "_AVG", target.isAvgYn());
-            BigDecimal byteLength = valueWhenEnabled(
-                    aggregate, prefix + "_BYTE_LEN", target.isByteLenYn());
-            BigDecimal distinctCount = valueWhenEnabled(
-                    aggregate, prefix + "_DIST_CNT", target.isDistCntYn());
-            BigDecimal nullCount = valueWhenEnabled(
-                    aggregate, prefix + "_NULL_CNT", target.isNullCntYn());
+            String sum = valueWhenEnabled(aggregate, prefix + "_SUM", target.isSumYn());
+            String min = valueWhenEnabled(aggregate, prefix + "_MIN", target.isMinYn());
+            String max = valueWhenEnabled(aggregate, prefix + "_MAX", target.isMaxYn());
+            String avg = valueWhenEnabled(aggregate, prefix + "_AVG", target.isAvgYn());
+            String distinctCount = valueWhenEnabled(aggregate, prefix + "_DIST_CNT", target.isDistCntYn());
+            String nullCount = valueWhenEnabled(aggregate, prefix + "_NULL_CNT", target.isNullCntYn());
             results.add(new SourceValidationResult(
-                    target.getColId(), rowCount, sum, min, max, avg,
-                    byteLength, distinctCount, nullCount));
+                            target.getColId(), rowCount, sum, min, max, avg,
+                             distinctCount, nullCount));
         }
         return List.copyOf(results);
     }
 
-    private BigDecimal valueWhenEnabled(
+    private String valueWhenEnabled(
             Map<String, Object> aggregate,
             String key,
             boolean enabled) throws ValidationException {
-        return enabled ? toBigDecimal(getAggregateValue(aggregate, key), key) : null;
+        return enabled ? toText(getAggregateValue(aggregate, key), key) : null;
     }
 
     private Object getAggregateValue(Map<String, Object> aggregate, String key)
@@ -137,42 +132,82 @@ public final class UnloadResultVerifyWorker {
         throw new ValidationException("집계 결과 컬럼이 없습니다: " + key);
     }
 
-    private BigDecimal toBigDecimal(Object value, String key) throws ValidationException {
+    static String toText(Object value, String key) throws ValidationException {
         if (value == null) {
             return null;
         }
-        if (value instanceof BigDecimal decimal) {
-            return decimal;
-        }
-        if (value instanceof Number number) {
-            return new BigDecimal(number.toString());
-        }
-        try {
-            return new BigDecimal(value.toString());
-        } catch (NumberFormatException e) {
+        String text = value instanceof BigDecimal decimal
+                ? decimal.toPlainString()
+                : value.toString();
+        if (text.length() > MAX_VALIDATION_VALUE_LENGTH) {
             throw new ValidationException(
-                    "집계 결과를 숫자로 변환할 수 없습니다: " + key + "=" + value, e);
+                    "집계 결과가 varchar(38) 범위를 초과합니다: "
+                            + key + ", length=" + text.length());
+        }
+        return text;
+    }
+
+    private int replaceSourceResults(
+            MigrationTableInfo table,
+            List<SourceValidationResult> results) throws SQLException {
+        boolean originalAutoCommit = godisConnection.getAutoCommit();
+        SQLException failure = null;
+        try {
+            if (originalAutoCommit) {
+                godisConnection.setAutoCommit(false);
+            }
+            try (Reader reader = Resources.getResourceAsReader("mybatis-config.xml")) {
+                SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader);
+                try (SqlSession session = factory.openSession(
+                        ConnectionUtil.nonClosing(godisConnection))) {
+                    MetaMapper mapper = session.getMapper(MetaMapper.class);
+                    int deletedRows = mapper.deleteValidationResults(
+                            parameter.getExecOrd(),
+                            table.getTableOwner(),
+                            table.getTableId(),
+                            table.getProcOrd());
+                    if (!results.isEmpty()) {
+                        mapper.upsertSourceValidationResults(
+                                parameter.getExecOrd(),
+                                table.getTableOwner(),
+                                table.getTableId(),
+                                table.getProcOrd(),
+                                resultManagerId(table),
+                                parameter.getMngrId(),
+                                results);
+                    }
+                    session.commit();
+                    return deletedRows;
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            failure = new SQLException("Failed to replace source validation results.", e);
+            rollbackAfterFailure(failure);
+            throw failure;
+        } catch (SQLException e) {
+            failure = e;
+            rollbackAfterFailure(e);
+            throw e;
+        } finally {
+            if (originalAutoCommit) {
+                try {
+                    godisConnection.setAutoCommit(true);
+                } catch (SQLException restoreFailure) {
+                    if (failure != null) {
+                        failure.addSuppressed(restoreFailure);
+                    } else {
+                        throw restoreFailure;
+                    }
+                }
+            }
         }
     }
 
-    private void saveSourceResults(
-            MigrationTableInfo table,
-            List<SourceValidationResult> results) throws SQLException {
-        try (Reader reader = Resources.getResourceAsReader("mybatis-config.xml")) {
-            SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader);
-            try (SqlSession session = factory.openSession(
-                    ConnectionUtil.nonClosing(godisConnection))) {
-                session.getMapper(MetaMapper.class).upsertSourceValidationResults(
-                        parameter.getExecOrd(),
-                        table.getTableId(),
-                        table.getProcOrd(),
-                        resultManagerId(table),
-                        parameter.getMngrId(),
-                        results);
-                session.commit();
-            }
-        } catch (IOException | RuntimeException e) {
-            throw new SQLException("Failed to save source validation results.", e);
+    private void rollbackAfterFailure(SQLException failure) {
+        try {
+            godisConnection.rollback();
+        } catch (SQLException rollbackFailure) {
+            failure.addSuppressed(rollbackFailure);
         }
     }
 
@@ -188,10 +223,11 @@ public final class UnloadResultVerifyWorker {
         ordered.sort(Comparator.comparingInt(ValidationTarget::getColOrd));
         for (ValidationTarget target : ordered) {
             if (target == null
-                    || !Objects.equals(table.getTableId(), target.getTableId())) {
+                    || !SqlUtil.identifiersEqual(table.getTableOwner(), target.getTableOwner())
+                    || !SqlUtil.identifiersEqual(table.getTableId(), target.getTableId())) {
                 throw new ValidationException(
-                        "TABLE_ID가 일치하지 않는 검증 대상이 있습니다: "
-                                + table.getTableId());
+                        "TABLE_OWNER/TABLE_ID가 일치하지 않는 검증 대상이 있습니다: "
+                                + table.getTableOwner() + "." + table.getTableId());
             }
             if (target.getColId() == null || target.getColId().isBlank()) {
                 throw new ValidationException("COL_ID가 없습니다: " + table.getTableId());
@@ -212,6 +248,20 @@ public final class UnloadResultVerifyWorker {
         }
     }
 
+    /** 지원하는 검증 플래그 중 하나 이상이 설정된 컬럼만 결과 저장 대상으로 선택한다. */
+    static List<ValidationTarget> enabledValidationTargets(
+            List<ValidationTarget> targets) {
+        return targets.stream()
+                .filter(target -> target.isSumYn()
+                        || target.isMinYn()
+                        || target.isMaxYn()
+                        || target.isAvgYn()
+                        || target.isDistCntYn()
+                        || target.isNullCntYn()
+                        || target.isHashYn())
+                .toList();
+    }
+
     private String resultManagerId(MigrationTableInfo table) {
         return table.getMngrId() == null || table.getMngrId().isBlank()
                 ? parameter.getMngrId()
@@ -225,6 +275,13 @@ public final class UnloadResultVerifyWorker {
         } catch (IllegalArgumentException e) {
             throw new ValidationException("Invalid " + description + ": " + value, e);
         }
+    }
+
+    private String qualifiedTableName(MigrationTableInfo table)
+            throws ValidationException {
+        String owner = validateIdentifier(table.getTableOwner(), "table owner");
+        String tableName = validateIdentifier(table.getTableNm(), "table name");
+        return owner + "." + tableName;
     }
 
 }

@@ -1,0 +1,37 @@
+CREATE TABLE `MIG_VRF_RESULT` (
+  `EXE_ORD` decimal(3,0) NOT NULL COMMENT '실행차수(PK1)',
+  `TABLE_OWNER` varchar(30) NOT NULL COMMENT '테이블OWNER(PK2)',
+  `TABLE_ID` varchar(30) NOT NULL COMMENT '테이블ID(PK3)',
+  `PROC_ORD` decimal(5,0) NOT NULL COMMENT '처리순서(PK4)',
+  `COL_ID` varchar(128) NOT NULL COMMENT '컬럼ID (PK5)',
+  `MNGR_ID` varchar(20) DEFAULT NULL COMMENT '담당자',
+  `SRC_ROW_CNT` varchar(38) DEFAULT NULL COMMENT '테이블건수 (추출 시점 테이블 행 수)',
+  `SRC_SUM_VAL` varchar(38) DEFAULT NULL COMMENT '추출합계값',
+  `SRC_MIN_VAL` varchar(38) DEFAULT NULL COMMENT '추출최소값 (날짜형은 숫자 환산)',
+  `SRC_MAX_VAL` varchar(38) DEFAULT NULL COMMENT '추출최대값',
+  `SRC_AVG_VAL` varchar(38) DEFAULT NULL COMMENT '추출평균값',
+  `SRC_HASH_VAL` varchar(38) DEFAULT NULL COMMENT '추출행값체크섬. FNV-1a 64비트 덧셈 누적',
+  `SRC_DIST_CNT_VAL` varchar(38) DEFAULT NULL COMMENT '추출고유값수. COUNT(DISTINCT col). 값 뒤섞임 검출',
+  `SRC_NULL_CNT_VAL` varchar(38) DEFAULT NULL COMMENT '추출NULL건수. COUNT(*)-COUNT(col). NULL이 빈문자열로 바뀌는 결함 검출',
+  `TGT_ROW_CNT` varchar(38) DEFAULT NULL COMMENT '테이블건수 (적재 시점 테이블 행 수)',
+  `TGT_SUM_VAL` varchar(38) DEFAULT NULL COMMENT '적재합계값',
+  `TGT_MIN_VAL` varchar(38) DEFAULT NULL COMMENT '적재최소값',
+  `TGT_MAX_VAL` varchar(38) DEFAULT NULL COMMENT '적재최대값',
+  `TGT_AVG_VAL` varchar(38) DEFAULT NULL COMMENT '적재평균값',
+  `TGT_HASH_VAL` varchar(38) DEFAULT NULL COMMENT '적재행값체크섬. FNV-1a 64비트 덧셈 누적',
+  `TGT_DIST_CNT_VAL` varchar(38) DEFAULT NULL COMMENT '적재고유값수. COUNT(DISTINCT col). 값 뒤섞임 검출',
+  `TGT_NULL_CNT_VAL` varchar(38) DEFAULT NULL COMMENT '적재NULL건수. COUNT(*)-COUNT(col). NULL이 빈문자열로 바뀌는 결함 검출',
+  `CONF_DTM` datetime DEFAULT NULL COMMENT '확인일시',
+  `VRF_STAT_CD` char(2) DEFAULT '30' COMMENT '검증상태코드 (10 정상 / 20 오류 / 30 미검증)',
+  `CONF_STAT_CD` char(2) DEFAULT '10' COMMENT '확인상태코드 (10 미확인 / 20 확인)',
+  `REG_ID` varchar(20) DEFAULT NULL COMMENT '등록자',
+  `REG_DTM` datetime DEFAULT NULL COMMENT '등록일시',
+  `LST_ADJPRN_ID` varchar(20) DEFAULT NULL COMMENT '최종수정자',
+  `LST_ADJ_DTM` datetime DEFAULT NULL ON UPDATE current_timestamp() COMMENT '최종수정일시',
+  PRIMARY KEY (`EXE_ORD`,`TABLE_OWNER`,`TABLE_ID`,`PROC_ORD`,`COL_ID`),
+  KEY `IX_MIG_VRF_RESULT_01` (`VRF_STAT_CD`,`CONF_STAT_CD`),
+  KEY `IX_MIG_VRF_RESULT_02` (`MNGR_ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC COMMENT='이관대상 테이블의 컬럼별 검증결과 관리';
+
+
+

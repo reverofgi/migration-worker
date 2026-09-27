@@ -2,12 +2,12 @@ package com.migration.metadata;
 
 import java.time.LocalDateTime;
 
-/** GPCL_MIG_VRF_TARGET에서 조회한 컬럼별 검증 대상 메타데이터. */
+/** MIG_COL_INFO에서 조회한 컬럼별 검증 대상 메타데이터. */
 public class ValidationTarget {
+    private String tableOwner;
     private String tableId;
     private String colId;
     private int colOrd;
-    private String tableNm;
     private String colNm;
     private String dataType;
     private boolean pkYn;
@@ -17,13 +17,14 @@ public class ValidationTarget {
     private boolean maxYn;
     private boolean avgYn;
     private boolean hashYn;
-    private boolean byteLenYn;
     private boolean distCntYn;
     private boolean nullCntYn;
     private String regId;
     private LocalDateTime regDtm;
     private String lstAdjprnId;
     private LocalDateTime lstAdjDtm;
+
+    public String getTableOwner() { return tableOwner; }
 
     public String getTableId() { return tableId; }
     // public void setTableId(String tableId) { this.tableId = tableId; }
@@ -33,9 +34,6 @@ public class ValidationTarget {
 
     public int getColOrd() { return colOrd; }
     // public void setColOrd(int colOrd) { this.colOrd = colOrd; }
-
-    public String getTableNm() { return tableNm; }
-    // public void setTableNm(String tableNm) { this.tableNm = tableNm; }
 
     public String getColNm() { return colNm; }
     // public void setColNm(String colNm) { this.colNm = colNm; }
@@ -63,9 +61,6 @@ public class ValidationTarget {
 
     public boolean isHashYn() { return hashYn; }
     // public void setHashYn(boolean hashYn) { this.hashYn = hashYn; }
-
-    public boolean isByteLenYn() { return byteLenYn; }
-    // public void setByteLenYn(boolean byteLenYn) { this.byteLenYn = byteLenYn; }
 
     public boolean isDistCntYn() { return distCntYn; }
     // public void setDistCntYn(boolean distCntYn) { this.distCntYn = distCntYn; }
