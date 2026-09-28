@@ -13,6 +13,30 @@ public interface MetaMapper {
     MigrationTableInfo selectMigrationTable(
         @Param("taskId") String taskId);
 
+    int upsertMigrationExecutionStart(
+            @Param("execOrd") int execOrd,
+            @Param("tableOwner") String tableOwner,
+            @Param("tableId") String tableId,
+            @Param("procOrd") int procOrd,
+            @Param("jobTypeCode") String jobTypeCode,
+            @Param("auditId") String auditId);
+
+    int completeMigrationExecution(
+            @Param("execOrd") int execOrd,
+            @Param("tableOwner") String tableOwner,
+            @Param("tableId") String tableId,
+            @Param("procOrd") int procOrd,
+            @Param("jobTypeCode") String jobTypeCode,
+            @Param("auditId") String auditId);
+
+    int failMigrationExecution(
+            @Param("execOrd") int execOrd,
+            @Param("tableOwner") String tableOwner,
+            @Param("tableId") String tableId,
+            @Param("procOrd") int procOrd,
+            @Param("jobTypeCode") String jobTypeCode,
+            @Param("auditId") String auditId);
+
     List<ValidationTarget> selectValidationTargets(
         @Param("tableOwner") String tableOwner,
         @Param("tableId") String tableId);

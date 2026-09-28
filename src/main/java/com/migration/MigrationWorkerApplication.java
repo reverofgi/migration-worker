@@ -8,6 +8,8 @@ import com.migration.exception.MigrationException;
 import com.migration.exception.MetadataException;
 import com.migration.metadata.MigrationDatabasePrefixes;
 import com.migration.metadata.MigrationMetadataLoader;
+import com.migration.metadata.MigrationTableInfo;
+import com.migration.util.LogUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +43,8 @@ public final class MigrationWorkerApplication {
         } catch (Exception e) {
             exitCode = ExitCode.SYSTEM_ERROR.getCode();
             LOGGER.error("Migration Worker 실행 중 예상하지 못한 오류가 발생했습니다.", e);
+        } finally {
+            LogUtil.clearTaskFileLogging();
         }
 
         System.exit(exitCode);
@@ -54,9 +58,16 @@ public final class MigrationWorkerApplication {
         // 2. GODIS 연결은 Application이 생성하고 전체 실행 동안 소유한다.
         try (Connection godisConnection = connectionFactory.createGodisConnection())
         {
-            MigrationDatabasePrefixes databasePrefixes = new MigrationMetadataLoader()
+            MigrationMetadataLoader metadataLoader = new MigrationMetadataLoader();
+            MigrationTableInfo table = metadataLoader.loadMigrationTable(
+                    godisConnection, parameter.getTaskId());
+            MigrationDatabasePrefixes databasePrefixes = metadataLoader
                     .loadDatabasePrefixes(godisConnection, parameter.getTaskId());
-            initializeProperties(godisConnection);
+            int propertyCount = initializeProperties(godisConnection);
+
+            // 최종 테이블 키로 로그 파일을 먼저 확정한 뒤 이후 초기화 로그를 기록한다.
+            LogUtil.initializeTaskFileLogging(parameter, table);
+            LOGGER.info("Migration 전역 설정 {}건을 초기화했습니다.", propertyCount);
 
             // 3. TASK_ID의 PREFIX와 공통코드 키를 조합하여 AS-IS/TO-BE에 연결한다.
             try (Connection sourceConnection =
@@ -68,6 +79,7 @@ public final class MigrationWorkerApplication {
                 // 4. 생성된 실행 문맥과 Connection을 Worker에 전달한다.
                 MigrationWorker worker = new MigrationWorker(
                         parameter,
+                        table,
                         godisConnection,
                         sourceConnection,
                         targetConnection);
@@ -76,11 +88,10 @@ public final class MigrationWorkerApplication {
         }
     }
 
-    private static void initializeProperties(Connection godisConnection)
+    private static int initializeProperties(Connection godisConnection)
             throws MetadataException {
         try {
-            int propertyCount = MigrationProperties.initialize(godisConnection);
-            LOGGER.info("Migration 전역 설정 {}건을 초기화했습니다.", propertyCount);
+            return MigrationProperties.initialize(godisConnection);
         } catch (SQLException e) {
             throw new MetadataException("Failed to initialize migration properties.", e);
         }

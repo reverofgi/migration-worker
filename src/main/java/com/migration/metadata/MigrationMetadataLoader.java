@@ -16,6 +16,32 @@ import java.util.Objects;
 /** GODIS 이관 메타데이터 조회와 실행 전 유효성 검사를 담당한다. */
 public final class MigrationMetadataLoader {
 
+    public MigrationTableInfo loadMigrationTable(
+            Connection connection,
+            String taskId) throws MetadataException {
+        Objects.requireNonNull(connection, "connection");
+        if (taskId == null || taskId.isBlank()) {
+            throw new MetadataException("TASK_ID must not be blank.");
+        }
+
+        try (Reader reader = Resources.getResourceAsReader("mybatis-config.xml")) {
+            SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader);
+            try (SqlSession session = factory.openSession(
+                    ConnectionUtil.nonClosing(connection))) {
+                MigrationTableInfo table = session.getMapper(MetaMapper.class)
+                        .selectMigrationTable(taskId.trim());
+                if (table == null) {
+                    throw new MetadataException(
+                            "MIG_TBL_INFO에 TASK_ID가 없습니다: " + taskId);
+                }
+                return table;
+            }
+        } catch (IOException | RuntimeException e) {
+            throw new MetadataException(
+                    "Failed to load migration table for TASK_ID: " + taskId, e);
+        }
+    }
+
     public MigrationDatabasePrefixes loadDatabasePrefixes(
             Connection connection,
             String taskId) throws MetadataException {

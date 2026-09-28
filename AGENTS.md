@@ -11,6 +11,7 @@ ASIS데이터베이스(HP-unix, SybaseIQ16.0)에서 공유볼륨에 파일을 �
 TOBE베이터베이스(Linux, SybaseIQ16.2)에서 공유볼륨에 생성된 파일을 적재합니다.
 이때 GODIS웹의 배치프래임워크는 TOBE베이터베이스가 설치된 시스템에 docker 위에서 운영됩니다.
 즉, TOBE시스템의 shell을 이용하여 배치java를 실행하는 구조입니다.
+
 ## Sybase IQ SQL에 사용하는 Linux 서버 경로
 DB_EXPORT_DATA_PATH=/opt/sap/iq161/IQ-16_1/demo/data
 DB_EXPORT_BLOB_PATH=/opt/sap/iq161/IQ-16_1/demo/blob

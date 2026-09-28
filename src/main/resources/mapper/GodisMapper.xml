@@ -109,6 +109,58 @@
          WHERE GRP_CD_ID = 'MIGRATION'
     </select>
 
+    <!-- 같은 실행차수의 재실행은 기존 PK 행을 실행중 상태로 초기화한다. -->
+    <insert id="upsertMigrationExecutionStart">
+        INSERT INTO MIG_EXEC_DTL (
+            EXE_ORD, TABLE_OWNER, TABLE_ID, PROC_ORD, JOB_TP_CD,
+            STRT_DTM, END_DTM, TOTAL_CNT, EXEC_STAT_CD, ERR_CD,
+            REG_ID, REG_DTM, LST_ADJPRN_ID, LST_ADJ_DTM
+        ) VALUES (
+            #{execOrd}, #{tableOwner}, #{tableId}, #{procOrd}, #{jobTypeCode},
+            NOW(), NULL, NULL, '10', NULL,
+            #{auditId}, NOW(), #{auditId}, NOW()
+        )
+        ON DUPLICATE KEY UPDATE
+            STRT_DTM = NOW(),
+            END_DTM = NULL,
+            TOTAL_CNT = NULL,
+            EXEC_STAT_CD = '10',
+            ERR_CD = NULL,
+            REG_ID = VALUES(REG_ID),
+            REG_DTM = NOW(),
+            LST_ADJPRN_ID = VALUES(LST_ADJPRN_ID),
+            LST_ADJ_DTM = NOW()
+    </insert>
+
+    <update id="completeMigrationExecution">
+        UPDATE MIG_EXEC_DTL
+           SET END_DTM = NOW()
+             , EXEC_STAT_CD = '20'
+             , ERR_CD = NULL
+             , LST_ADJPRN_ID = #{auditId}
+             , LST_ADJ_DTM = NOW()
+         WHERE EXE_ORD = #{execOrd}
+           AND TABLE_OWNER = #{tableOwner}
+           AND TABLE_ID = #{tableId}
+           AND PROC_ORD = #{procOrd}
+           AND JOB_TP_CD = #{jobTypeCode}
+    </update>
+
+    <!-- ERR_CD 공통코드가 확정되지 않아 오류 상태와 종료일시만 기록한다. -->
+    <update id="failMigrationExecution">
+        UPDATE MIG_EXEC_DTL
+           SET END_DTM = NOW()
+             , EXEC_STAT_CD = '30'
+             , ERR_CD = NULL
+             , LST_ADJPRN_ID = #{auditId}
+             , LST_ADJ_DTM = NOW()
+         WHERE EXE_ORD = #{execOrd}
+           AND TABLE_OWNER = #{tableOwner}
+           AND TABLE_ID = #{tableId}
+           AND PROC_ORD = #{procOrd}
+           AND JOB_TP_CD = #{jobTypeCode}
+    </update>
+
     <select id="selectValidationTargets" resultMap="validationTargetMap">
         SELECT TRIM(TABLE_OWNER) AS TABLE_OWNER
              , TRIM(TABLE_ID) AS TABLE_ID

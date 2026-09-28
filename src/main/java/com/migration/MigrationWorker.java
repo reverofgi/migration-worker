@@ -5,29 +5,24 @@ import com.migration.config.ExitCode;
 import com.migration.exception.InitializationException;
 import com.migration.exception.MigrationException;
 import com.migration.exception.MetadataException;
-import com.migration.metadata.MetaMapper;
+import com.migration.metadata.MigrationExecutionDetailRecorder;
+import com.migration.metadata.MigrationJobType;
 import com.migration.metadata.MigrationTableInfo;
 import com.migration.worker.SybaseIQUnloadWorker;
 import com.migration.worker.SybaseIQLoadWorker;
 import com.migration.worker.LoadResultVerifyWorker;
 import com.migration.worker.UnloadResultVerifyWorker;
-import com.migration.util.ConnectionUtil;
-import org.apache.ibatis.io.Resources;
-import org.apache.ibatis.session.SqlSession;
-import org.apache.ibatis.session.SqlSessionFactory;
-import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.Reader;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Objects;
 
 /**
  * Batch Group 실행 흐름의 기본 구조.
  *
- * - 메타데이터 조회
+ * - Application에서 조회한 메타데이터 사용
  * - 물리 스키마 조회
  * - 데이터 추출
  * - 데이터 적재
@@ -46,50 +41,86 @@ public final class MigrationWorker {
     private final Connection godisConnection;
     private final Connection asisConnection;
     private final Connection tobeConnection;
+    private final MigrationTableInfo table;
+    private final MigrationExecutionDetailRecorder executionDetailRecorder;
 
     MigrationWorker(
             MigrationParameter config,
+            MigrationTableInfo table,
             Connection godisConnection,
             Connection asisConnection,
             Connection tobeConnection) {
         this.config = config;
+        this.table = Objects.requireNonNull(table, "table");
         this.godisConnection = godisConnection;
         this.asisConnection = asisConnection;
         this.tobeConnection = tobeConnection;
+        this.executionDetailRecorder = new MigrationExecutionDetailRecorder(
+                godisConnection, config);
     }
     /**
      * 하나의 Batch Group을 실행한다.
      */
     public void execute() throws MigrationException {
-        LOGGER.info(
-                "Migration Worker를 시작합니다. EXEC_ORD={}, TASK_ID={}, MNGR_ID={}",
-                config.getExecOrd(),
-                config.getTaskId(),
-                config.getMngrId());
-
         validateConnections();
 
-        // 마이그레이션은 테이블 1개씩 실행하므로, 처리 대상이 한개이다.
-        // 대량용량 테이블의 경우, 한개 테이블을 기간등의 조건으로 여러 번 나누어 실시
-        MigrationTableInfo table = loadMigrationTable();
-        unload(table);
-        unloadResultVerify(table);
-        load(table);
-        loadResultVerify(table);
+        LOGGER.info(
+                "Migration Worker를 시작합니다. EXEC_ORD={}, TASK_ID={}, MNGR_ID={}",
+                config.getExecOrd(), config.getTaskId(), config.getMngrId());
+
+        // 1. UNLOAD 시작일시 저장 -> AS-IS 데이터 추출 -> 종료일시 저장
+        executionDetailRecorder.start(table, MigrationJobType.UNLOAD);
+        try {
+            unload(table);
+            executionDetailRecorder.complete(table, MigrationJobType.UNLOAD);
+        } catch (MigrationException | RuntimeException e) {
+            recordStageFailure(table, MigrationJobType.UNLOAD, e);
+            throw e;
+        }
+
+        // 2. UNLOAD_VRF 시작일시 저장 -> AS-IS 추출결과 검증 -> 종료일시 저장
+        executionDetailRecorder.start(table, MigrationJobType.UNLOAD_VRF);
+        try {
+            unloadResultVerify(table);
+            executionDetailRecorder.complete(table, MigrationJobType.UNLOAD_VRF);
+        } catch (MigrationException | RuntimeException e) {
+            recordStageFailure(table, MigrationJobType.UNLOAD_VRF, e);
+            throw e;
+        }
+
+        // 3. LOAD 시작일시 저장 -> TO-BE 데이터 적재 -> 종료일시 저장
+        executionDetailRecorder.start(table, MigrationJobType.LOAD);
+        try {
+            load(table);
+            executionDetailRecorder.complete(table, MigrationJobType.LOAD);
+        } catch (MigrationException | RuntimeException e) {
+            recordStageFailure(table, MigrationJobType.LOAD, e);
+            throw e;
+        }
+
+        // 4. LOAD_VRF 시작일시 저장 -> TO-BE 적재결과 검증 -> 종료일시 저장
+        executionDetailRecorder.start(table, MigrationJobType.LOAD_VRF);
+        try {
+            loadResultVerify(table);
+            executionDetailRecorder.complete(table, MigrationJobType.LOAD_VRF);
+        } catch (MigrationException | RuntimeException e) {
+            recordStageFailure(table, MigrationJobType.LOAD_VRF, e);
+            throw e;
+        }
 
         LOGGER.info("Migration Worker가 정상적으로 종료되었습니다.");
     }
 
-    private MigrationTableInfo loadMigrationTable() throws MetadataException {
-        try (Reader reader = Resources.getResourceAsReader("mybatis-config.xml")) {
-            SqlSessionFactory factory = new SqlSessionFactoryBuilder().build(reader);
-            try (SqlSession session = factory.openSession(
-                    ConnectionUtil.nonClosing(godisConnection))) {
-                return session.getMapper(MetaMapper.class)
-                        .selectMigrationTable(config.getTaskId());
-            }
-        } catch (IOException | RuntimeException e) {
-            throw new MetadataException("Failed to load migration table metadata.", e);
+    private void recordStageFailure(
+            MigrationTableInfo table,
+            MigrationJobType jobType,
+            Throwable originalFailure) {
+        try {
+            executionDetailRecorder.fail(table, jobType);
+        } catch (MetadataException historyFailure) {
+            originalFailure.addSuppressed(historyFailure);
+            LOGGER.error("이관 단계 오류 이력을 저장하지 못했습니다: jobType={}",
+                    jobType, historyFailure);
         }
     }
 

@@ -9,9 +9,7 @@
 구현 판단은 다음 순서를 따른다.
 
 1. `docs/Table정보/*.sql`
-2. 제공된 샘플 데이터
-3. `docs/개발요건/2단계_5_ChatGPT 내용검토후 재수정.md`
-4. 일반적인 개발 관행
+2. `docs/개발요건/대용량데이터_이관_개발 MasterPrompt .md`
 
 충돌이나 불명확한 항목은 명시적으로 기록한다. 확인되지 않은 컬럼, SQL 문법, 상태 코드, 설정 규약은 만들지 말고 TODO 또는 확장 지점으로 남긴다.
 
@@ -34,10 +32,6 @@
 - 검증 성공 전 Extract 파일을 삭제하지 않는다.
 - 예외를 무시하거나 단순 `printStackTrace()`로 처리하지 않는다. 실행 문맥과 원인을 보존하고 정의된 Exit Code로 전달한다.
 
-## 단계별 개발
-
-Phase 3 Physical Schema, Phase 4 SQL Builder, Phase 5 Extract/Load, Phase 6 Validation, Phase 7 Orchestration, Phase 8 Integration Test 순서를 지킨다. 요청받은 Phase만 구현하고 다음 Phase 기능을 선행 구현하지 않는다. 각 단계에서 컴파일과 테스트를 통과한 후 진행한다.
-
 ## 코드 및 테스트 위치
 
 - Java: `src/main/java/com/migration`
@@ -45,4 +39,4 @@ Phase 3 Physical Schema, Phase 4 SQL Builder, Phase 5 Extract/Load, Phase 6 Vali
 - 테스트: `src/test/java`
 - 요구사항: `docs/개발요건`
 
-빌드와 검증은 `mvn clean test`, 패키징은 `mvn clean package`를 사용한다. 테스트 클래스는 `*Test`, 테스트 메서드는 관찰 가능한 동작을 이름으로 사용한다. Metadata 테스트에는 `TASK_ID=100`, `200`, `300`, 정렬, 빈 결과, 잘못된 입력, Y/N 변환을 포함한다.
+빌드와 검증은 `mvn clean test`, 패키징은 `mvn clean package`를 사용한다. 테스트 클래스는 `*Test`, 테스트 메서드는 관찰 가능한 동작을 이름으로 사용한다.
